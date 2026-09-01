@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { jobApi } from '../../services/jobApi';
 import { Loader2, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { useWebSocket } from '../../hooks/useWebSocket';
 
 const StatusBadge = ({ status }: { status: string }) => {
   const map: Record<string, string> = {
@@ -25,6 +26,7 @@ export const Jobs: React.FC = () => {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState<number | null>(null);
+  const { connected, subscribe } = useWebSocket();
 
   const load = async () => {
     try {
@@ -34,6 +36,21 @@ export const Jobs: React.FC = () => {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (connected) {
+      subscribe('/topic/jobs', (updatedJob) => {
+        setJobs(prev => {
+          const exists = prev.find(j => j.id === updatedJob.id);
+          if (exists) {
+            return prev.map(j => j.id === updatedJob.id ? updatedJob : j);
+          } else {
+            return [updatedJob, ...prev];
+          }
+        });
+      });
+    }
+  }, [connected]);
 
   const handleRetry = async (id: number) => {
     setRetrying(id);
@@ -46,7 +63,14 @@ export const Jobs: React.FC = () => {
       <div className="flex items-center justify-between mb-lg">
         <div>
           <h1 className="font-h1 text-h1 font-bold text-on-surface">Background Jobs</h1>
-          <p className="text-on-surface-variant font-body-sm">{jobs.length} total jobs</p>
+          <p className="text-on-surface-variant font-body-sm flex items-center gap-2">
+            {jobs.length} total jobs 
+            {connected ? (
+               <span className="text-green-600 text-xs flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Live</span>
+            ) : (
+               <span className="text-outline text-xs">Offline</span>
+            )}
+          </p>
         </div>
         <button onClick={load} className="flex items-center gap-xs border border-outline-variant px-md py-sm rounded-lg hover:bg-surface-container transition-colors text-label-md">
           <RefreshCw size={14} /> Refresh

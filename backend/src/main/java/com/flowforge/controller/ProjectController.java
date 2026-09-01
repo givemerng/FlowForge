@@ -1,5 +1,6 @@
 package com.flowforge.controller;
 
+import com.flowforge.aspect.Auditable;
 import com.flowforge.dto.request.ProjectRequest;
 import com.flowforge.dto.response.ProjectResponse;
 import com.flowforge.service.ProjectService;
@@ -26,6 +27,7 @@ public class ProjectController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @Auditable(action = "CREATE_PROJECT", resource = "Project")
     public ResponseEntity<ProjectResponse> createProject(@Valid @RequestBody ProjectRequest project) {
         return ResponseEntity.ok(projectService.createProject(project));
     }
@@ -37,12 +39,14 @@ public class ProjectController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @Auditable(action = "UPDATE_PROJECT", resource = "Project")
     public ResponseEntity<ProjectResponse> updateProject(@PathVariable Long id, @Valid @RequestBody ProjectRequest projectDetails) {
         return ResponseEntity.ok(projectService.updateProject(id, projectDetails));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @Auditable(action = "DELETE_PROJECT", resource = "Project")
     public ResponseEntity<Void> deleteProject(@PathVariable Long id) {
         projectService.deleteProject(id);
         return ResponseEntity.noContent().build();

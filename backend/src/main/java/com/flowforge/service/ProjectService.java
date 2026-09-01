@@ -84,4 +84,13 @@ public class ProjectService {
         return projectRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
     }
+
+    public void checkProjectAccess(Long projectId, User user) {
+        Project project = requireProject(projectId);
+        // Simple check: if not admin/manager, verify they are a member
+        if (user.getRole() == User.Role.MEMBER) {
+            projectMemberRepository.findByProjectIdAndUserId(projectId, user.getId())
+                    .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Access denied"));
+        }
+    }
 }

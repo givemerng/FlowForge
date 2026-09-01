@@ -1,5 +1,6 @@
 package com.flowforge.controller;
 
+import com.flowforge.aspect.Auditable;
 import com.flowforge.dto.request.TaskRequest;
 import com.flowforge.dto.response.TaskResponse;
 import com.flowforge.service.TaskService;
@@ -24,6 +25,7 @@ public class ProjectTaskController {
     }
 
     @PostMapping
+    @Auditable(action = "CREATE_TASK", resource = "Task")
     public ResponseEntity<TaskResponse> createTask(@PathVariable Long projectId, @Valid @RequestBody TaskRequest task) {
         return ResponseEntity.ok(taskService.createTask(projectId, task));
     }

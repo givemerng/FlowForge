@@ -10,6 +10,7 @@ import com.flowforge.repository.ReportRepository;
 import com.flowforge.repository.UserRepository;
 import com.flowforge.security.UserDetailsImpl;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,18 +29,20 @@ public class ReportController {
     private final JobRepository jobRepository;
     private final UserRepository userRepository;
     private final RabbitTemplate rabbitTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Value("${flowforge.rabbitmq.jobs-queue:flowforge.jobs}")
     private String jobsQueue;
 
     public ReportController(ReportRepository reportRepository, ProjectRepository projectRepository,
                              JobRepository jobRepository, UserRepository userRepository,
-                             RabbitTemplate rabbitTemplate) {
+                             RabbitTemplate rabbitTemplate, SimpMessagingTemplate messagingTemplate) {
         this.reportRepository = reportRepository;
         this.projectRepository = projectRepository;
         this.jobRepository = jobRepository;
         this.userRepository = userRepository;
         this.rabbitTemplate = rabbitTemplate;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @GetMapping
@@ -86,6 +89,11 @@ public class ReportController {
 
         // Publish to RabbitMQ
         rabbitTemplate.convertAndSend(jobsQueue, payload);
+
+        // Broadcast new job creation
+        com.flowforge.dto.response.JobResponse response = com.flowforge.dto.response.JobResponse.from(savedJob);
+        messagingTemplate.convertAndSend("/topic/jobs", response);
+        messagingTemplate.convertAndSend("/topic/jobs/" + savedJob.getId(), response);
 
         return ResponseEntity.ok(Map.of(
             "reportId", savedReport.getId(),

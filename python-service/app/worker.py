@@ -19,12 +19,29 @@ JOBS_QUEUE = os.getenv("JOBS_QUEUE", "flowforge.jobs")
 MAX_RETRIES = 3
 
 
-def update_job_status(db, job_id: int, status: str, result: str = None, error: str = None):
+def publish_job_event(ch, job_id: int, status: str):
+    if not ch or not job_id:
+        return
+    event_payload = json.dumps({"jobId": job_id, "status": status})
+    try:
+        ch.basic_publish(
+            exchange='',
+            routing_key='flowforge.job.events',
+            body=event_payload,
+            properties=pika.BasicProperties(delivery_mode=2) # Persistent
+        )
+    except Exception as e:
+        logger.error(f"Failed to publish job event: {e}")
+
+def update_job_status(db, job_id: int, status: str, result: str = None, error: str = None, ch=None):
     now = datetime.utcnow()
     db.execute(text(
         "UPDATE jobs SET status=:status, last_error=:error, updated_at=:now WHERE id=:job_id"
     ), {"status": status, "error": error, "now": now, "job_id": job_id})
     db.commit()
+    if ch:
+        publish_job_event(ch, job_id, status)
+
 
 
 def process_report(payload: dict, db) -> str:
@@ -105,7 +122,7 @@ def process_job(ch, method, properties, body):
                     ch.basic_ack(delivery_tag=method.delivery_tag)
                     return
                 # Mark as processing
-                update_job_status(db, job_id, "PROCESSING")
+                update_job_status(db, job_id, "PROCESSING", ch=ch)
 
         logger.info(f"Processing job {job_id} type={job_type}")
 
@@ -119,7 +136,7 @@ def process_job(ch, method, properties, body):
             raise ValueError(f"Unknown job type: {job_type}")
 
         if job_id:
-            update_job_status(db, job_id, "COMPLETED")
+            update_job_status(db, job_id, "COMPLETED", ch=ch)
 
         logger.info(f"Job {job_id} completed successfully.")
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -137,10 +154,11 @@ def process_job(ch, method, properties, body):
                     "UPDATE jobs SET attempt_count = attempt_count + 1, status='QUEUED', last_error=:err, updated_at=:now WHERE id=:jid"
                 ), {"err": str(e), "now": datetime.utcnow(), "jid": job_id})
                 db.commit()
+                publish_job_event(ch, job_id, "QUEUED")
                 # Requeue
                 ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
             else:
-                update_job_status(db, job_id, "FAILED", error=str(e))
+                update_job_status(db, job_id, "FAILED", error=str(e), ch=ch)
                 ch.basic_ack(delivery_tag=method.delivery_tag)
         else:
             ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -156,6 +174,7 @@ def start_consuming():
             connection = pika.BlockingConnection(params)
             channel = connection.channel()
             channel.queue_declare(queue=JOBS_QUEUE, durable=True)
+            channel.queue_declare(queue='flowforge.job.events', durable=True)
             channel.basic_qos(prefetch_count=1)
             channel.basic_consume(queue=JOBS_QUEUE, on_message_callback=process_job)
             logger.info(f"Worker started. Listening on queue: {JOBS_QUEUE}")

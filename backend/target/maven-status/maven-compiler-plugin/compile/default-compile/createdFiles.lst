@@ -1,5 +1,7 @@
 com\flowforge\exception\ApiError.class
 com\flowforge\controller\JobController.class
+com\flowforge\service\LabelService.class
+com\flowforge\dto\request\UserRoleRequest.class
 com\flowforge\repository\ReportRepository.class
 com\flowforge\service\ProjectService.class
 com\flowforge\dto\request\SignupRequest.class
@@ -8,8 +10,10 @@ com\flowforge\security\AuthTokenFilter.class
 com\flowforge\entity\Report.class
 com\flowforge\repository\ProjectMemberRepository.class
 com\flowforge\controller\AnalyticsController.class
+com\flowforge\controller\TaskLabelController.class
 com\flowforge\dto\response\ProjectResponse.class
 com\flowforge\entity\Project.class
+com\flowforge\controller\AuditLogController.class
 com\flowforge\dto\request\TaskRequest.class
 com\flowforge\repository\JobAttemptRepository.class
 com\flowforge\entity\JobAttempt.class
@@ -20,17 +24,21 @@ com\flowforge\entity\Task$Status.class
 com\flowforge\config\DataSeeder.class
 com\flowforge\service\AuditService.class
 com\flowforge\entity\User$Role.class
+com\flowforge\repository\LabelRepository.class
 com\flowforge\dto\response\TaskResponse.class
 com\flowforge\entity\Task$Priority.class
 com\flowforge\repository\ProjectRepository.class
 com\flowforge\entity\Job$Status.class
 com\flowforge\service\CurrentUserService.class
 com\flowforge\entity\ProjectMember.class
+com\flowforge\aspect\AuditAspect.class
 com\flowforge\security\AuthEntryPointJwt.class
+com\flowforge\dto\response\LabelResponse.class
 com\flowforge\repository\JobRepository.class
 com\flowforge\dto\request\ProjectRequest.class
 com\flowforge\dto\request\TaskStatusRequest.class
 com\flowforge\repository\AuditLogRepository.class
+com\flowforge\service\JobEventListener.class
 com\flowforge\entity\Notification.class
 com\flowforge\controller\ProjectController.class
 com\flowforge\entity\Job.class
@@ -39,8 +47,11 @@ com\flowforge\controller\ReportController.class
 com\flowforge\controller\TaskController.class
 com\flowforge\repository\CommentRepository.class
 com\flowforge\dto\request\TaskAssignRequest.class
+com\flowforge\controller\LabelController.class
 com\flowforge\entity\Comment.class
 com\flowforge\exception\GlobalExceptionHandler.class
+com\flowforge\config\WebSocketConfig.class
+com\flowforge\dto\request\LabelRequest.class
 com\flowforge\repository\NotificationRepository.class
 com\flowforge\security\UserDetailsImpl.class
 com\flowforge\security\WebSecurityConfig.class
@@ -54,6 +65,7 @@ com\flowforge\config\RabbitConfig.class
 com\flowforge\FlowForgeApplication.class
 com\flowforge\repository\UserRepository.class
 com\flowforge\dto\request\LoginRequest.class
+com\flowforge\aspect\Auditable.class
 com\flowforge\entity\TaskLabel.class
 com\flowforge\controller\SearchController.class
 com\flowforge\security\UserDetailsServiceImpl.class
@@ -64,4 +76,5 @@ com\flowforge\dto\response\JobResponse.class
 com\flowforge\entity\AuditLog.class
 com\flowforge\entity\Task.class
 com\flowforge\dto\response\JwtResponse.class
+com\flowforge\repository\TaskLabelRepository.class
 com\flowforge\controller\NotificationController.class

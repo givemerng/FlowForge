@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "spring.datasource.driver-class-name=org.h2.Driver",
     "spring.datasource.username=sa",
     "spring.datasource.password=",
-    "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
+    "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
     "spring.jpa.hibernate.ddl-auto=create-drop",
     "spring.rabbitmq.host=localhost",
     "spring.rabbitmq.port=5672",
@@ -50,11 +50,24 @@ public class AuthControllerTest {
     private JwtUtils jwtUtils;
 
     @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        userRepository.deleteAll();
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+        jdbcTemplate.execute("TRUNCATE TABLE users");
+        jdbcTemplate.execute("TRUNCATE TABLE projects");
+        jdbcTemplate.execute("TRUNCATE TABLE tasks");
+        jdbcTemplate.execute("TRUNCATE TABLE audit_logs");
+        jdbcTemplate.execute("TRUNCATE TABLE project_members");
+        jdbcTemplate.execute("TRUNCATE TABLE comments");
+        jdbcTemplate.execute("TRUNCATE TABLE reports");
+        jdbcTemplate.execute("TRUNCATE TABLE job_attempts");
+        jdbcTemplate.execute("TRUNCATE TABLE jobs");
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
     }
 
     @Test

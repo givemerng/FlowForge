@@ -1,5 +1,7 @@
 import { TaskCard, Task } from './TaskCard';
 import { MoreHorizontal, Plus } from 'lucide-react';
+import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 interface KanbanColumnProps {
   title: string;
@@ -8,6 +10,10 @@ interface KanbanColumnProps {
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, tasks, indicatorColor }) => {
+  const { setNodeRef } = useDroppable({
+    id: title, // use column title as drop target id (e.g. "TODO")
+  });
+
   return (
     <div className="w-[320px] shrink-0 flex flex-col max-h-full">
       <div className="flex justify-between items-center mb-sm px-xs">
@@ -23,14 +29,16 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, tasks, indica
         </button>
       </div>
       
-      <div className="flex-1 overflow-y-auto space-y-sm pr-xs pb-lg custom-scrollbar">
-        {tasks.length === 0 ? (
-           <div className="flex flex-col items-center justify-center py-xl border-2 border-dashed border-outline-variant/50 rounded-lg">
-               <p className="font-metadata text-metadata text-on-surface-variant">No tasks</p>
-           </div>
-        ) : (
-           tasks.map(task => <TaskCard key={task.id} task={task} />)
-        )}
+      <div ref={setNodeRef} className="flex-1 overflow-y-auto space-y-sm pr-xs pb-lg custom-scrollbar min-h-[150px]">
+        <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+          {tasks.length === 0 ? (
+             <div className="flex flex-col items-center justify-center py-xl border-2 border-dashed border-outline-variant/50 rounded-lg">
+                 <p className="font-metadata text-metadata text-on-surface-variant">No tasks</p>
+             </div>
+          ) : (
+             tasks.map(task => <TaskCard key={task.id} task={task} />)
+          )}
+        </SortableContext>
       </div>
       
       <button className="mt-sm flex items-center gap-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container px-sm py-xs rounded transition-colors font-label-md text-label-md">

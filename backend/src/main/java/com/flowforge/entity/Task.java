@@ -40,6 +40,9 @@ public class Task {
 
     private LocalDateTime deadline;
 
+    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<TaskLabel> taskLabels = new java.util.ArrayList<>();
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -78,6 +81,9 @@ public class Task {
 
     public LocalDateTime getDeadline() { return deadline; }
     public void setDeadline(LocalDateTime deadline) { this.deadline = deadline; }
+
+    public java.util.List<TaskLabel> getTaskLabels() { return taskLabels; }
+    public void setTaskLabels(java.util.List<TaskLabel> taskLabels) { this.taskLabels = taskLabels; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

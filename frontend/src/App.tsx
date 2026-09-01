@@ -13,6 +13,8 @@ import { Jobs } from './pages/Jobs/Jobs';
 import { Monitoring } from './pages/Monitoring/Monitoring';
 import { Notifications } from './pages/Notifications/Notifications';
 import { Settings } from './pages/Settings/Settings';
+import { AdminDashboard } from './pages/Admin/AdminDashboard';
+import { AuditLogs } from './pages/Admin/AuditLogs';
 
 // Protected route guard
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
@@ -50,6 +52,9 @@ function App() {
           <Route path="/monitoring" element={<Monitoring />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/settings" element={<Settings />} />
+
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/audit-logs" element={<AuditLogs />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

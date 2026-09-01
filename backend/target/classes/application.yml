@@ -67,5 +67,6 @@ flowforge:
     jwtExpirationMs: ${JWT_EXPIRATION:86400000}
   rabbitmq:
     jobs-queue: ${JOBS_QUEUE:flowforge.jobs}
+    job-events-queue: ${JOB_EVENTS_QUEUE:flowforge.job.events}
   rate-limit:
     requests-per-minute: ${RATE_LIMIT_REQUESTS_PER_MINUTE:100}

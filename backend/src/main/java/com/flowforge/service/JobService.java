@@ -8,6 +8,7 @@ import com.flowforge.repository.JobAttemptRepository;
 import com.flowforge.repository.JobRepository;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,16 +22,18 @@ public class JobService {
     private final RabbitTemplate rabbitTemplate;
     private final AuditService auditService;
     private final CurrentUserService currentUserService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Value("${flowforge.rabbitmq.jobs-queue:flowforge.jobs}")
     private String jobsQueue;
 
-    public JobService(JobRepository jobRepository, JobAttemptRepository jobAttemptRepository, RabbitTemplate rabbitTemplate, AuditService auditService, CurrentUserService currentUserService) {
+    public JobService(JobRepository jobRepository, JobAttemptRepository jobAttemptRepository, RabbitTemplate rabbitTemplate, AuditService auditService, CurrentUserService currentUserService, SimpMessagingTemplate messagingTemplate) {
         this.jobRepository = jobRepository;
         this.jobAttemptRepository = jobAttemptRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.auditService = auditService;
         this.currentUserService = currentUserService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -60,7 +63,11 @@ public class JobService {
 
         rabbitTemplate.convertAndSend(jobsQueue, saved.getPayload());
         auditService.record(currentUserService.requireCurrentUser(), "JOB_RETRIED", "Job", saved.getId(), null);
-        return JobResponse.from(saved);
+        
+        JobResponse response = JobResponse.from(saved);
+        messagingTemplate.convertAndSend("/topic/jobs/" + saved.getId(), response);
+        messagingTemplate.convertAndSend("/topic/jobs", response);
+        return response;
     }
 
     private Job requireJob(Long id) {

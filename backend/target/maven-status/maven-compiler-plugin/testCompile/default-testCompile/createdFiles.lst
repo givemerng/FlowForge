@@ -1,0 +1,4 @@
+com\flowforge\controller\TaskControllerTest.class
+com\flowforge\controller\ProjectControllerTest.class
+com\flowforge\controller\AnalyticsControllerTest.class
+com\flowforge\controller\AuthControllerTest.class
