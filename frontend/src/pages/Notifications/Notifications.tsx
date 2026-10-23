@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { notificationApi } from '../../services/notificationApi';
 import { BellOff, Loader2, CheckCheck } from 'lucide-react';
+import type { Notification } from '../../types';
 
 export const Notifications: React.FC = () => {
-  const [notifs, setNotifs] = useState<any[]>([]);
+  const [notifs, setNotifs] = useState<Notification[]>([]);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     try {
       const res = await notificationApi.getAll();
       setNotifs(res.data);
-    } catch {} finally { setLoading(false); }
+    } catch { setError('Unable to load notifications.'); } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
@@ -42,6 +44,8 @@ export const Notifications: React.FC = () => {
           </button>
         )}
       </div>
+
+      {error && <div className="mb-md p-sm rounded-lg bg-error-container text-on-error-container">{error}</div>}
 
       {loading ? (
         <div className="flex justify-center py-xl"><Loader2 size={32} className="animate-spin text-primary" /></div>

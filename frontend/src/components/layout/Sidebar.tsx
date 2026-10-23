@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { 
   Plus, 
   LayoutDashboard, 
@@ -9,22 +9,29 @@ import {
   BarChart3, 
   ShieldAlert, 
   UserCircle, 
-  Settings 
+  Settings,
+  FileText,
+  Briefcase,
+  Brain
 } from 'lucide-react';
 
 const Sidebar = () => {
+  const role = localStorage.getItem('role') || 'MEMBER';
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'My Tasks', path: '/my-tasks', icon: CheckSquare },
     { name: 'Projects', path: '/projects', icon: FolderKanban },
     { name: 'Notifications', path: '/notifications', icon: Bell },
-    { name: 'Workspace', path: '#', icon: Users },
+    { name: 'Insights', path: '/insights', icon: Brain },
+    { name: 'Reports', path: '/reports', icon: FileText },
     { name: 'Analytics', path: '/analytics', icon: BarChart3 },
-    { name: 'Administration', path: '/monitoring', icon: ShieldAlert },
-  ];
+    { name: 'Jobs', path: '/jobs', icon: Briefcase, roles: ['ADMIN', 'MANAGER'] },
+    { name: 'Monitoring', path: '/monitoring', icon: ShieldAlert, roles: ['ADMIN', 'MANAGER'] },
+    { name: 'Users', path: '/admin', icon: Users, roles: ['ADMIN'] },
+  ].filter(item => !item.roles || item.roles.includes(role));
 
   const bottomItems = [
-    { name: 'Profile', path: '#', icon: UserCircle },
+    { name: 'Profile', path: '/settings', icon: UserCircle },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
@@ -35,10 +42,12 @@ const Sidebar = () => {
         <p className="font-metadata text-metadata text-on-surface-variant">v2.4.0</p>
       </div>
       
-      <button className="w-full bg-primary-container text-on-primary-container font-label-md text-label-md py-sm px-md rounded mb-lg hover:bg-primary-container/90 transition-colors flex items-center justify-center gap-sm">
-        <Plus size={18} />
-        New Project
-      </button>
+      {role !== 'MEMBER' && (
+        <Link to="/projects" className="w-full bg-primary-container text-on-primary-container font-label-md text-label-md py-sm px-md rounded mb-lg hover:bg-primary-container/90 transition-colors flex items-center justify-center gap-sm">
+          <Plus size={18} />
+          New Project
+        </Link>
+      )}
       
       <ul className="flex flex-col gap-xs flex-1 overflow-y-auto">
         {navItems.map((item) => {

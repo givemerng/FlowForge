@@ -38,7 +38,6 @@ public class JobEventListener {
                 JobResponse response = JobResponse.from(job);
                 logger.debug("Broadcasting STOMP event for job {} status {}", jobId, job.getStatus());
                 messagingTemplate.convertAndSend("/topic/jobs/" + jobId, response);
-                messagingTemplate.convertAndSend("/topic/jobs", response); // Broadcast to list as well
             });
         } catch (Exception e) {
             logger.error("Error processing job event message: {}", message, e);

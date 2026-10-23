@@ -2,17 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { analyticsApi } from '../../services/analyticsApi';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Loader2, BarChart3 } from 'lucide-react';
+import type { AnalyticsOverview } from '../../types';
 
 const COLORS = ['#6366f1', '#3b82f6', '#f59e0b', '#ef4444', '#10b981'];
 
 export const Analytics: React.FC = () => {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<AnalyticsOverview | null>(null);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     analyticsApi.getOverview()
       .then(r => setData(r.data))
-      .catch(() => {})
+      .catch(() => setError('Unable to load analytics.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -23,7 +25,7 @@ export const Analytics: React.FC = () => {
   );
 
   if (!data) return (
-    <div className="flex items-center justify-center h-full text-on-surface-variant">No data available.</div>
+    <div className="flex items-center justify-center h-full text-on-surface-variant">{error || 'No data available.'}</div>
   );
 
   const statusData = data.tasksByStatus

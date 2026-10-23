@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, CheckCircle2, Clock, Filter } from 'lucide-react';
+import { taskApi } from '../../services/taskApi';
+import type { Task } from '../../types';
 
 const PriorityBadge = ({ p }: { p: string }) => {
   const map: Record<string, string> = {
@@ -23,24 +25,17 @@ const StatusBadge = ({ s }: { s: string }) => {
 };
 
 export const MyTasks: React.FC = () => {
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Fetch all tasks from all projects - simplified: fetch from /api/tasks/my
-    // For now show from the first project or all visible tasks
     const fetchTasks = async () => {
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'}/tasks`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setTasks(data);
-        }
-      } catch {} finally { setLoading(false); }
+        const response = await taskApi.getAllAssigned();
+        setTasks(response.data);
+      } catch { setError('Unable to load your assigned tasks.'); } finally { setLoading(false); }
     };
     fetchTasks();
   }, []);
@@ -67,6 +62,8 @@ export const MyTasks: React.FC = () => {
           </select>
         </div>
       </div>
+
+      {error && <div className="p-sm rounded-lg bg-error-container text-on-error-container">{error}</div>}
 
       {loading ? (
         <div className="flex justify-center py-xl"><Loader2 size={32} className="animate-spin text-primary" /></div>

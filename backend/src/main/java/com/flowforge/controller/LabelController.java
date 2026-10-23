@@ -6,12 +6,15 @@ import com.flowforge.dto.response.LabelResponse;
 import com.flowforge.service.LabelService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/projects/{projectId}/labels")
+@Tag(name = "Label", description = "API endpoints for Label")
 public class LabelController {
 
     private final LabelService labelService;
@@ -21,18 +24,21 @@ public class LabelController {
     }
 
     @GetMapping
+    @Operation(summary = "Get Project Labels")
     public ResponseEntity<List<LabelResponse>> getProjectLabels(@PathVariable Long projectId) {
         return ResponseEntity.ok(labelService.getProjectLabels(projectId));
     }
 
     @PostMapping
     @Auditable(action = "CREATE_LABEL", resource = "Label")
+    @Operation(summary = "Create Label")
     public ResponseEntity<LabelResponse> createLabel(@PathVariable Long projectId, @Valid @RequestBody LabelRequest request) {
         return ResponseEntity.ok(labelService.createLabel(projectId, request));
     }
 
     @DeleteMapping("/{labelId}")
     @Auditable(action = "DELETE_LABEL", resource = "Label")
+    @Operation(summary = "Delete Label")
     public ResponseEntity<Void> deleteLabel(@PathVariable Long projectId, @PathVariable Long labelId) {
         labelService.deleteLabel(labelId);
         return ResponseEntity.noContent().build();

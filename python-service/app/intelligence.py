@@ -3,7 +3,7 @@ Risk Analysis Worker
 Implements deterministic, explainable rule-based risk scoring.
 Designed so an ML model can replace the scoring logic later.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import text
 from app.database import SessionLocal
 import logging
@@ -106,7 +106,7 @@ def calculate_risk(task_id: int) -> dict:
             "risk": risk_level,
             "riskScore": score,
             "reasons": reasons,
-            "calculatedAt": datetime.utcnow().isoformat()
+            "calculatedAt": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -145,7 +145,7 @@ def calculate_workload(user_id: int) -> dict:
         upcoming_row = db.execute(text(
             "SELECT COUNT(*) FROM tasks WHERE assigned_to_id = :uid AND status NOT IN ('DONE') "
             "AND deadline IS NOT NULL AND deadline BETWEEN :now AND :soon"
-        ), {"uid": user_id, "now": now, "soon": now.replace(day=now.day+7) if now.day <= 24 else now}).fetchone()
+        ), {"uid": user_id, "now": now, "soon": now + timedelta(days=7)}).fetchone()
         upcoming_deadlines = upcoming_row[0] if upcoming_row else 0
 
         # Compute workload score
@@ -171,7 +171,7 @@ def calculate_workload(user_id: int) -> dict:
             "upcomingDeadlines": upcoming_deadlines,
             "workloadScore": score,
             "workloadLevel": level,
-            "calculatedAt": datetime.utcnow().isoformat()
+            "calculatedAt": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:

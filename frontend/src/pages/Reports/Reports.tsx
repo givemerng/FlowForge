@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { reportApi } from '../../services/reportApi';
 import { projectApi } from '../../services/projectApi';
 import { FileText, Plus, Loader2, RefreshCw } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
+import type { Job, Project, Report } from '../../types';
 
 const StatusBadge = ({ status }: { status: string }) => {
   const map: Record<string, string> = {
@@ -15,33 +16,47 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 export const Reports: React.FC = () => {
-  const [reports, setReports] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ projectId: '', type: 'PROJECT_SUMMARY' });
   const [generating, setGenerating] = useState(false);
   const { connected, subscribe } = useWebSocket();
+  const jobIds = reports.flatMap(report => report.job ? [report.job.id] : []).sort((a, b) => a - b).join(',');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [rRes, pRes] = await Promise.all([reportApi.getAll(), projectApi.getAll()]);
       setReports(rRes.data);
       setProjects(pRes.data);
-    } catch {} finally { setLoading(false); }
-  };
+    } catch { setError('Unable to load reports.'); } finally { setLoading(false); }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  const hasPendingReport = reports.some(report =>
+    report.job?.status === 'QUEUED' || report.job?.status === 'PROCESSING'
+  );
 
   useEffect(() => {
-    if (connected) {
-      subscribe('/topic/jobs', (updatedJob) => {
-        setReports(prev => prev.map(r => 
-          r.job?.id === updatedJob.id ? { ...r, job: updatedJob } : r
+    if (!hasPendingReport) return;
+    const timer = window.setInterval(() => { void load(); }, 2000);
+    return () => window.clearInterval(timer);
+  }, [hasPendingReport, load]);
+
+  useEffect(() => {
+    if (!connected) return;
+    const subscriptions = jobIds.split(',').filter(Boolean).map(jobId =>
+      subscribe<Job>(`/topic/jobs/${jobId}`, (updatedJob) => {
+        setReports(prev => prev.map(report =>
+          report.job?.id === updatedJob.id ? { ...report, job: updatedJob } : report
         ));
-      });
-    }
-  }, [connected]);
+      })
+    );
+    return () => subscriptions.forEach(subscription => subscription?.unsubscribe());
+  }, [connected, subscribe, jobIds]);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +65,7 @@ export const Reports: React.FC = () => {
       await reportApi.generate(Number(form.projectId), form.type);
       setShowCreate(false);
       await load();
-    } catch {} finally { setGenerating(false); }
+    } catch { setError('Unable to generate the report.'); } finally { setGenerating(false); }
   };
 
   return (
@@ -78,6 +93,8 @@ export const Reports: React.FC = () => {
         </div>
       </div>
 
+      {error && <div className="mb-md p-sm rounded-lg bg-error-container text-on-error-container">{error}</div>}
+
       {loading ? (
         <div className="flex justify-center py-xl"><Loader2 size={32} className="animate-spin text-primary" /></div>
       ) : reports.length === 0 ? (
@@ -88,7 +105,7 @@ export const Reports: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-sm">
-          {reports.map((r: any) => (
+          {reports.map(r => (
             <div key={r.id} className="bg-surface-container-lowest rounded-xl border border-outline-variant p-md flex items-center gap-md">
               <div className="w-10 h-10 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center">
                 <FileText size={18} />

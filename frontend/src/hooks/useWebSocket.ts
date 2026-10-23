@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
@@ -13,6 +13,9 @@ export const useWebSocket = () => {
   useEffect(() => {
     const client = new Client({
       webSocketFactory: () => new SockJS(WS_URL),
+      connectHeaders: {
+        Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+      },
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
@@ -38,18 +41,18 @@ export const useWebSocket = () => {
     };
   }, []);
 
-  const subscribe = (topic: string, callback: (message: any) => void) => {
+  const subscribe = useCallback(<T,>(topic: string, callback: (message: T) => void) => {
     if (!clientRef.current || !connected) return null;
     
     return clientRef.current.subscribe(topic, (message) => {
       try {
-        const body = JSON.parse(message.body);
+        const body = JSON.parse(message.body) as T;
         callback(body);
       } catch (e) {
         console.error('Failed to parse STOMP message', e);
       }
     });
-  };
+  }, [connected]);
 
   return { connected, subscribe };
 };

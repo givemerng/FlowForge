@@ -20,29 +20,43 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final ProjectService projectService;
+    private final ProjectAccessService projectAccessService;
     private final CurrentUserService currentUserService;
     private final AuditService auditService;
 
-    public TaskService(TaskRepository taskRepository, UserRepository userRepository, ProjectService projectService, CurrentUserService currentUserService, AuditService auditService) {
+    public TaskService(TaskRepository taskRepository, UserRepository userRepository, ProjectService projectService,
+                       ProjectAccessService projectAccessService, CurrentUserService currentUserService,
+                       AuditService auditService) {
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
         this.projectService = projectService;
+        this.projectAccessService = projectAccessService;
         this.currentUserService = currentUserService;
         this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
     public List<TaskResponse> getProjectTasks(Long projectId) {
-        return taskRepository.findByProjectId(projectId).stream().map(TaskResponse::from).toList();
+        projectAccessService.requireAccess(projectId, currentUserService.requireCurrentUser());
+        return taskRepository.findDetailedByProjectId(projectId).stream().map(TaskResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponse> getMyTasks() {
+        User user = currentUserService.requireCurrentUser();
+        return taskRepository.findDetailedByAssignedToId(user.getId()).stream().map(TaskResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
     public TaskResponse getTask(Long id) {
-        return TaskResponse.from(requireTask(id));
+        Task task = requireTask(id);
+        projectAccessService.requireAccess(task.getProject().getId(), currentUserService.requireCurrentUser());
+        return TaskResponse.from(task);
     }
 
     @Transactional
     public TaskResponse createTask(Long projectId, TaskRequest request) {
+        projectAccessService.requireManager(projectId, currentUserService.requireCurrentUser());
         Project project = projectService.requireProject(projectId);
         Task task = new Task();
         applyRequest(task, request);
@@ -55,6 +69,7 @@ public class TaskService {
     @Transactional
     public TaskResponse updateStatus(Long id, TaskStatusRequest request) {
         Task task = requireTask(id);
+        projectAccessService.requireAccess(task.getProject().getId(), currentUserService.requireCurrentUser());
         task.setStatus(request.getStatus());
         Task saved = taskRepository.save(task);
         auditService.record(currentUserService.requireCurrentUser(), "TASK_STATUS_CHANGED", "Task", saved.getId(), "{\"status\":\"" + request.getStatus().name() + "\"}");
@@ -64,8 +79,8 @@ public class TaskService {
     @Transactional
     public TaskResponse assignTask(Long id, TaskAssignRequest request) {
         Task task = requireTask(id);
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        projectAccessService.requireManager(task.getProject().getId(), currentUserService.requireCurrentUser());
+        User user = requireAssignableUser(task.getProject().getId(), request.getUserId());
         task.setAssignedTo(user);
         Task saved = taskRepository.save(task);
         auditService.record(currentUserService.requireCurrentUser(), "TASK_ASSIGNED", "Task", saved.getId(), "{\"assignedTo\":" + user.getId() + "}");
@@ -75,6 +90,7 @@ public class TaskService {
     @Transactional
     public void deleteTask(Long id) {
         Task task = requireTask(id);
+        projectAccessService.requireManager(task.getProject().getId(), currentUserService.requireCurrentUser());
         taskRepository.delete(task);
         auditService.record(currentUserService.requireCurrentUser(), "TASK_DELETED", "Task", id, null);
     }
@@ -85,13 +101,19 @@ public class TaskService {
         task.setPriority(request.getPriority());
         task.setDeadline(request.getDeadline());
         if (request.getAssignedToId() != null) {
-            task.setAssignedTo(userRepository.findById(request.getAssignedToId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Assigned user not found")));
+            task.setAssignedTo(requireAssignableUser(task.getProject().getId(), request.getAssignedToId()));
         }
     }
 
     private Task requireTask(Long id) {
-        return taskRepository.findById(id)
+        return taskRepository.findDetailedById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
+    }
+
+    private User requireAssignableUser(Long projectId, Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assigned user not found"));
+        projectAccessService.requireAccess(projectId, user);
+        return user;
     }
 }

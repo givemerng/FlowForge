@@ -6,12 +6,15 @@ import com.flowforge.dto.response.TaskResponse;
 import com.flowforge.service.TaskService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/projects/{projectId}/tasks")
+@Tag(name = "ProjectTask", description = "API endpoints for ProjectTask")
 public class ProjectTaskController {
     private final TaskService taskService;
 
@@ -20,12 +23,14 @@ public class ProjectTaskController {
     }
 
     @GetMapping
+    @Operation(summary = "Get Project Tasks")
     public ResponseEntity<List<TaskResponse>> getProjectTasks(@PathVariable Long projectId) {
         return ResponseEntity.ok(taskService.getProjectTasks(projectId));
     }
 
     @PostMapping
     @Auditable(action = "CREATE_TASK", resource = "Task")
+    @Operation(summary = "Create Task")
     public ResponseEntity<TaskResponse> createTask(@PathVariable Long projectId, @Valid @RequestBody TaskRequest task) {
         return ResponseEntity.ok(taskService.createTask(projectId, task));
     }

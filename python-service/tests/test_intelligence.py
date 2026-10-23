@@ -78,7 +78,7 @@ class TestRiskAnalysis:
         mock_db.execute.return_value.fetchone.side_effect = [task_row, workload_row]
         result = calculate_risk(1)
 
-        assert "BLOCKED" in result.get("reasons", [])
+        assert any("blocked" in reason.lower() for reason in result.get("reasons", []))
         assert result["riskScore"] >= 25
 
     @patch("app.intelligence.SessionLocal")

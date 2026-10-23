@@ -1,0 +1,10 @@
+spring:
+  flyway:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.flowforge: INFO
+  file:
+    name: ${java.io.tmpdir}/flowforge-test.log

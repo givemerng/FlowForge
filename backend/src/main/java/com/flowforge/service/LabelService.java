@@ -24,24 +24,24 @@ public class LabelService {
     private final TaskRepository taskRepository;
     private final TaskLabelRepository taskLabelRepository;
     private final CurrentUserService currentUserService;
-    private final ProjectService projectService;
+    private final ProjectAccessService projectAccessService;
 
     public LabelService(LabelRepository labelRepository, 
                         ProjectRepository projectRepository, 
                         TaskRepository taskRepository, 
                         TaskLabelRepository taskLabelRepository,
                         CurrentUserService currentUserService,
-                        ProjectService projectService) {
+                        ProjectAccessService projectAccessService) {
         this.labelRepository = labelRepository;
         this.projectRepository = projectRepository;
         this.taskRepository = taskRepository;
         this.taskLabelRepository = taskLabelRepository;
         this.currentUserService = currentUserService;
-        this.projectService = projectService;
+        this.projectAccessService = projectAccessService;
     }
 
     public List<LabelResponse> getProjectLabels(Long projectId) {
-        projectService.checkProjectAccess(projectId, currentUserService.requireCurrentUser());
+        projectAccessService.requireAccess(projectId, currentUserService.requireCurrentUser());
         return labelRepository.findByProjectId(projectId).stream()
                 .map(LabelResponse::from)
                 .toList();
@@ -52,9 +52,7 @@ public class LabelService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         
-        // Members might be allowed to create labels, but let's say only managers/admins/owners
-        // Since no explicit permission framework for labels is given, check access
-        projectService.checkProjectAccess(projectId, currentUserService.requireCurrentUser());
+        projectAccessService.requireManager(projectId, currentUserService.requireCurrentUser());
 
         if (labelRepository.existsByProjectIdAndNameIgnoreCase(projectId, request.getName())) {
             throw new IllegalArgumentException("Label with this name already exists in the project");
@@ -72,7 +70,7 @@ public class LabelService {
     public void deleteLabel(Long id) {
         Label label = labelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Label not found"));
-        projectService.checkProjectAccess(label.getProject().getId(), currentUserService.requireCurrentUser());
+        projectAccessService.requireManager(label.getProject().getId(), currentUserService.requireCurrentUser());
         labelRepository.delete(label);
     }
 
@@ -87,7 +85,7 @@ public class LabelService {
             throw new IllegalArgumentException("Label and Task must belong to the same project");
         }
 
-        projectService.checkProjectAccess(task.getProject().getId(), currentUserService.requireCurrentUser());
+        projectAccessService.requireManager(task.getProject().getId(), currentUserService.requireCurrentUser());
 
         if (taskLabelRepository.findByTaskIdAndLabelId(taskId, labelId).isEmpty()) {
             TaskLabel taskLabel = new TaskLabel();
@@ -101,7 +99,7 @@ public class LabelService {
     public void removeLabelFromTask(Long taskId, Long labelId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
-        projectService.checkProjectAccess(task.getProject().getId(), currentUserService.requireCurrentUser());
+        projectAccessService.requireManager(task.getProject().getId(), currentUserService.requireCurrentUser());
 
         taskLabelRepository.deleteByTaskIdAndLabelId(taskId, labelId);
     }

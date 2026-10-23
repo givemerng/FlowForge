@@ -1,0 +1,13 @@
+backend/target/
+frontend/node_modules/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
+python-service/.venv/
+python-service/.pytest_cache/
+python-service/**/__pycache__/
+*.py[cod]
+*.log
+backend/logs/
+.env
+.env.production

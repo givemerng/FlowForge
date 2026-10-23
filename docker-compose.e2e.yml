@@ -1,0 +1,5 @@
+services:
+  java-api:
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      JWT_SECRET: ${JWT_SECRET:-dGVzdFNlY3JldEtleUZvckZsb3dGb3JnZUVuZFRvRW5kVGVzdGluZ0tleQ==}

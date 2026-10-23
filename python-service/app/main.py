@@ -1,8 +1,10 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 import threading
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from app.worker import start_consuming
 from app.intelligence import calculate_risk, calculate_workload
@@ -13,19 +15,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    worker_thread = threading.Thread(target=start_consuming, daemon=True)
+    worker_thread.start()
+    logger.info("RabbitMQ worker thread started.")
+    yield
+
 app = FastAPI(
     title="FlowForge Python Service",
     description="Background processing, risk analysis, and workload intelligence",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 @app.get("/health")
 def health_check():
@@ -34,6 +37,11 @@ def health_check():
         "service": "flowforge-python-worker",
         "version": "1.0.0"
     }
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/api/risk/{task_id}")
@@ -46,13 +54,6 @@ def get_risk_analysis(task_id: int):
 def get_workload(user_id: int):
     """Get workload analysis for a specific user."""
     return calculate_workload(user_id)
-
-
-@app.on_event("startup")
-def startup_event():
-    worker_thread = threading.Thread(target=start_consuming, daemon=True)
-    worker_thread.start()
-    logger.info("RabbitMQ worker thread started.")
 
 
 if __name__ == "__main__":

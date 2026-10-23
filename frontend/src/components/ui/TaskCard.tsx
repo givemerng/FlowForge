@@ -1,17 +1,10 @@
-import { Calendar, Paperclip, AlignLeft } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-export interface Task {
-  id: number;
-  title: string;
-  status: string;
-  priority: string;
-  createdAt: string;
-  assignedTo?: { id: number, username: string };
-  labels?: { id: number, name: string, color: string }[];
-}
+import type { Task } from '../../types';
+export type { Task } from '../../types';
 
 interface TaskCardProps {
   task: Task;
@@ -75,10 +68,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
         <div className="flex items-center gap-xs text-on-surface-variant font-metadata text-metadata">
           <Calendar size={14} />
           {new Date(task.createdAt).toLocaleDateString()}
-        </div>
-        <div className="flex items-center gap-xs text-on-surface-variant font-metadata text-metadata opacity-0 group-hover:opacity-100 transition-opacity">
-          <AlignLeft size={14} />
-          <Paperclip size={14} />
         </div>
       </div>
     </div>

@@ -120,4 +120,55 @@ public class ProjectControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("Existing Project"));
     }
+
+    @Test
+    @WithMockUser(username = "testuser", roles = {"MEMBER"})
+    void testMemberCannotReadUnrelatedProject() throws Exception {
+        when(currentUserService.requireCurrentUser()).thenReturn(testUser);
+        User otherOwner = new User();
+        otherOwner.setUsername("otherowner");
+        otherOwner.setEmail("other@example.com");
+        otherOwner.setPassword("password123");
+        otherOwner.setRole(User.Role.MANAGER);
+        userRepository.save(otherOwner);
+
+        Project project = new Project();
+        project.setName("Private Project");
+        project.setOwner(otherOwner);
+        projectRepository.save(project);
+
+        mockMvc.perform(get("/api/projects/" + project.getId()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "othermanager", roles = {"MANAGER"})
+    void testManagerCannotUpdateOrDeleteUnrelatedProject() throws Exception {
+        User owner = new User();
+        owner.setUsername("projectowner");
+        owner.setEmail("projectowner@example.com");
+        owner.setPassword("password123");
+        owner.setRole(User.Role.MANAGER);
+        userRepository.save(owner);
+
+        User otherManager = new User();
+        otherManager.setUsername("othermanager");
+        otherManager.setEmail("othermanager@example.com");
+        otherManager.setPassword("password123");
+        otherManager.setRole(User.Role.MANAGER);
+        userRepository.save(otherManager);
+        when(currentUserService.requireCurrentUser()).thenReturn(otherManager);
+
+        Project project = new Project();
+        project.setName("Owner Project");
+        project.setOwner(owner);
+        projectRepository.save(project);
+
+        mockMvc.perform(put("/api/projects/" + project.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Blocked update\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/projects/" + project.getId()))
+                .andExpect(status().isForbidden());
+    }
 }

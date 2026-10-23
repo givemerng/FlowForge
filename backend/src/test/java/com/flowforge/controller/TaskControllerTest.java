@@ -135,4 +135,53 @@ public class TaskControllerTest {
         Task updated = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(updated.getStatus()).isEqualTo(Task.Status.IN_PROGRESS);
     }
+
+    @Test
+    @WithMockUser(username = "testuser", roles = {"MEMBER"})
+    void testMemberCannotUpdateTaskInUnrelatedProject() throws Exception {
+        when(currentUserService.requireCurrentUser()).thenReturn(testUser);
+        User otherOwner = new User();
+        otherOwner.setUsername("taskowner");
+        otherOwner.setEmail("taskowner@example.com");
+        otherOwner.setPassword("password123");
+        otherOwner.setRole(User.Role.MANAGER);
+        userRepository.save(otherOwner);
+
+        Project otherProject = new Project();
+        otherProject.setName("Other Project");
+        otherProject.setOwner(otherOwner);
+        projectRepository.save(otherProject);
+
+        Task task = new Task();
+        task.setTitle("Private Task");
+        task.setProject(otherProject);
+        taskRepository.save(task);
+
+        mockMvc.perform(put("/api/tasks/" + task.getId() + "/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"DONE\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "testuser", roles = "MEMBER")
+    void testCannotAssignTaskToUserOutsideProject() throws Exception {
+        when(currentUserService.requireCurrentUser()).thenReturn(testUser);
+        User unrelatedUser = new User();
+        unrelatedUser.setUsername("unrelated");
+        unrelatedUser.setEmail("unrelated@example.com");
+        unrelatedUser.setPassword("password123");
+        unrelatedUser.setRole(User.Role.MEMBER);
+        userRepository.save(unrelatedUser);
+
+        Task task = new Task();
+        task.setTitle("Unassigned Task");
+        task.setProject(testProject);
+        taskRepository.save(task);
+
+        mockMvc.perform(put("/api/tasks/{id}/assign", task.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":" + unrelatedUser.getId() + "}"))
+                .andExpect(status().isForbidden());
+    }
 }

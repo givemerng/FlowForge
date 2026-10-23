@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Brain, Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import type { RiskResult } from '../../types';
+import { insightApi } from '../../services/insightApi';
 
 const RiskBadge = ({ risk }: { risk: string }) => {
   const map: Record<string, string> = {
@@ -17,23 +19,21 @@ const RiskBadge = ({ risk }: { risk: string }) => {
 };
 
 export const Insights: React.FC = () => {
-  const [insights, setInsights] = useState<any[]>([]);
+  const [insights, setInsights] = useState<RiskResult[]>([]);
   const [taskId, setTaskId] = useState('');
   const [fetching, setFetching] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<RiskResult | null>(null);
 
   const analyzeTask = async (e: React.FormEvent) => {
     e.preventDefault();
     setFetching(true);
     setResult(null);
     try {
-      const baseUrl = import.meta.env.VITE_PYTHON_URL || 'http://localhost:8000';
-      const res = await fetch(`${baseUrl}/api/risk/${taskId}`);
-      const data = await res.json();
+      const { data } = await insightApi.analyzeTask(Number(taskId));
       setResult(data);
-      setInsights(prev => [data, ...prev.filter((i: any) => i.taskId !== data.taskId)].slice(0, 10));
+      setInsights(prev => [data, ...prev.filter(i => i.taskId !== data.taskId)].slice(0, 10));
     } catch {
-      setResult({ error: 'Failed to reach Python intelligence service.' });
+      setResult({ error: 'Unable to analyze this task.' });
     } finally {
       setFetching(false);
     }
@@ -72,17 +72,17 @@ export const Insights: React.FC = () => {
               <>
                 <div className="flex items-center justify-between mb-sm">
                   <span className="font-label-md font-semibold text-on-surface">Task #{result.taskId}</span>
-                  <RiskBadge risk={result.risk} />
+                  <RiskBadge risk={result.risk || 'LOW'} />
                 </div>
                 <div className="mb-sm">
                   <div className="flex items-center justify-between text-body-sm mb-xs">
                     <span className="text-on-surface-variant">Risk Score</span>
-                    <span className="font-semibold text-on-surface">{result.riskScore}/100</span>
+                    <span className="font-semibold text-on-surface">{result.riskScore ?? 0}/100</span>
                   </div>
                   <div className="bg-surface-container rounded-full h-2">
                     <div className={`h-2 rounded-full transition-all ${
-                      result.riskScore >= 70 ? 'bg-red-500' : result.riskScore >= 40 ? 'bg-yellow-500' : 'bg-green-500'
-                    }`} style={{ width: `${result.riskScore}%` }} />
+                      (result.riskScore ?? 0) >= 70 ? 'bg-red-500' : (result.riskScore ?? 0) >= 40 ? 'bg-yellow-500' : 'bg-green-500'
+                    }`} style={{ width: `${result.riskScore ?? 0}%` }} />
                   </div>
                 </div>
                 <div className="space-y-xs">
@@ -102,7 +102,7 @@ export const Insights: React.FC = () => {
         <div>
           <h3 className="font-label-lg font-semibold text-on-surface mb-md">Recent Analyses</h3>
           <div className="space-y-sm">
-            {insights.map((i: any) => (
+            {insights.map(i => (
               <div key={i.taskId} className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md flex items-center gap-md">
                 <div className="flex-1">
                   <p className="font-label-md text-on-surface">Task #{i.taskId}</p>
@@ -110,7 +110,7 @@ export const Insights: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-sm">
                   <span className="font-label-md text-on-surface-variant">{i.riskScore}/100</span>
-                  <RiskBadge risk={i.risk} />
+                  <RiskBadge risk={i.risk || 'LOW'} />
                 </div>
               </div>
             ))}

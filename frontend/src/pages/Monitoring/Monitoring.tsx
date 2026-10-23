@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import api from '../../services/api';
 import { Activity, Server, Database, MessageSquare, Zap, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import api from '../../services/api';
 
 interface ServiceStatus {
   name: string;
@@ -22,13 +22,10 @@ export const Monitoring: React.FC = () => {
     { name: 'RabbitMQ (via API)', url: '/actuator/health', status: 'UNKNOWN', icon: MessageSquare },
     { name: 'Redis (via API)', url: '/actuator/health', status: 'UNKNOWN', icon: Zap },
   ]);
-  const [_metrics, _setMetrics] = useState<any>(null);
-  const [_loading, _setLoading] = useState(true);
-
   useEffect(() => {
     const check = async () => {
       try {
-        const res = await api.get('/actuator/health');
+        const res = await api.get('/monitoring/health');
         const health = res.data;
         setServices(prev => prev.map(s => {
           if (s.name === 'Java API') return { ...s, status: health.status === 'UP' ? 'HEALTHY' : 'OFFLINE' };
@@ -37,13 +34,9 @@ export const Monitoring: React.FC = () => {
           if (s.name === 'Redis (via API)') return { ...s, status: health.components?.redis?.status === 'UP' ? 'HEALTHY' : 'OFFLINE' };
           return s;
         }));
-
-        // Fetch some metrics
-        const mRes = await api.get('/actuator/metrics/http.server.requests').catch(() => null);
-        if (mRes) _setMetrics(mRes.data);
       } catch {
         setServices(prev => prev.map(s => ({ ...s, status: 'OFFLINE' })));
-      } finally { _setLoading(false); }
+      }
     };
     check();
     const interval = setInterval(check, 30000);
@@ -89,7 +82,6 @@ export const Monitoring: React.FC = () => {
             { label: 'Grafana Dashboard', url: 'http://localhost:3000', desc: 'Visual metrics and dashboards' },
             { label: 'Prometheus', url: 'http://localhost:9090', desc: 'Raw metrics and queries' },
             { label: 'RabbitMQ Management', url: 'http://localhost:15672', desc: 'Queue depth and message count' },
-            { label: 'Spring Actuator', url: 'http://localhost:8080/actuator', desc: 'Application health endpoints' },
           ].map(l => (
             <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-sm p-sm rounded-lg border border-outline-variant hover:border-primary/40 hover:bg-surface-container transition-all">

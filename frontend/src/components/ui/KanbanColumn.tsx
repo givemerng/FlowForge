@@ -15,7 +15,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, tasks, indica
   });
 
   return (
-    <div className="w-[320px] shrink-0 flex flex-col max-h-full">
+    <div className="flex-1 min-w-[250px] shrink-0 flex flex-col max-h-full">
       <div className="flex justify-between items-center mb-sm px-xs">
         <div className="flex items-center gap-sm">
           <span className={`w-2 h-2 rounded-full ${indicatorColor}`}></span>

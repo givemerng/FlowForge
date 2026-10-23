@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface JobAttemptRepository extends JpaRepository<JobAttempt, Long> {
     List<JobAttempt> findByJobIdOrderByAttemptNumberAsc(Long jobId);
+    long countByJobId(Long jobId);
 }

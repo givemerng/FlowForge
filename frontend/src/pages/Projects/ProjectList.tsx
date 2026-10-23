@@ -2,15 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { projectApi } from '../../services/projectApi';
 import { Plus, Loader2, Folder, Users, MoreVertical, Search } from 'lucide-react';
+import type { Project } from '../../types';
 
 export const ProjectList: React.FC = () => {
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', description: '' });
   const [creating, setCreating] = useState(false);
+  const canCreate = localStorage.getItem('role') !== 'MEMBER';
 
   const load = async () => {
     try {
@@ -46,10 +48,12 @@ export const ProjectList: React.FC = () => {
           <h1 className="font-h1 text-h1 font-bold text-on-surface">Projects</h1>
           <p className="text-on-surface-variant font-body-sm mt-xs">{projects.length} project{projects.length !== 1 ? 's' : ''} total</p>
         </div>
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-xs bg-primary text-on-primary px-md py-sm rounded-lg text-label-md font-label-md hover:bg-primary/90 transition-colors">
-          <Plus size={16} /> New Project
-        </button>
+        {canCreate && (
+          <button onClick={() => setShowCreate(true)}
+            className="flex items-center gap-xs bg-primary text-on-primary px-md py-sm rounded-lg text-label-md font-label-md hover:bg-primary/90 transition-colors">
+            <Plus size={16} /> New Project
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -67,7 +71,9 @@ export const ProjectList: React.FC = () => {
         <div className="text-center py-2xl border-2 border-dashed border-outline-variant rounded-xl">
           <Folder size={48} className="mx-auto text-on-surface-variant opacity-30 mb-sm" />
           <p className="font-label-lg text-on-surface-variant">No projects found</p>
-          <p className="font-body-sm text-on-surface-variant mt-xs">Create your first project to get started.</p>
+          <p className="font-body-sm text-on-surface-variant mt-xs">
+            {canCreate ? 'Create your first project to get started.' : 'No projects have been shared with you.'}
+          </p>
         </div>
       )}
 
@@ -101,7 +107,7 @@ export const ProjectList: React.FC = () => {
       </div>
 
       {/* Create Modal */}
-      {showCreate && (
+      {canCreate && showCreate && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xl w-[480px] p-xl">
             <h2 className="font-h2 text-h2 font-bold text-on-surface mb-lg">New Project</h2>

@@ -11,4 +11,9 @@ public class RabbitConfig {
     public Queue jobsQueue(@Value("${flowforge.rabbitmq.jobs-queue:flowforge.jobs}") String queueName) {
         return new Queue(queueName, true);
     }
+
+    @Bean
+    public Queue jobEventsQueue(@Value("${flowforge.rabbitmq.job-events-queue:flowforge.job.events}") String queueName) {
+        return new Queue(queueName, true);
+    }
 }

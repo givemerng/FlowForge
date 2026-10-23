@@ -2,9 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../../services/authApi';
 import { User, Mail, Lock, ArrowRight, Loader2, CheckCircle } from 'lucide-react';
+import { AxiosError } from 'axios';
+
+const initialForm = { username: '', email: '', password: '', confirm: '' };
+type FormField = keyof typeof initialForm;
 
 export const Register: React.FC = () => {
-  const [form, setForm] = useState({ username: '', email: '', password: '', confirm: '' });
+  const [form, setForm] = useState(initialForm);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -23,8 +27,9 @@ export const Register: React.FC = () => {
       await authApi.register({ username: form.username, email: form.email, password: form.password });
       setSuccess(true);
       setTimeout(() => navigate('/login'), 2000);
-    } catch (err: any) {
-      setError(err.response?.data || 'Registration failed. Please try again.');
+    } catch (error) {
+      const responseData = (error as AxiosError<string | { message?: string }>).response?.data;
+      setError(typeof responseData === 'string' ? responseData : responseData?.message || 'Registration failed. Please try again.');
     } finally { setLoading(false); }
   };
 
@@ -67,7 +72,7 @@ export const Register: React.FC = () => {
               <div className="relative">
                 <Icon size={16} className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant" />
                 <input
-                  type={type} name={name} value={(form as any)[name]}
+                  type={type} name={name} value={form[name as FormField]}
                   onChange={handleChange} placeholder={placeholder} required
                   className="w-full pl-[36px] pr-sm py-[8px] bg-surface-container-lowest border border-outline-variant rounded-md text-body-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
                 />

@@ -1,27 +1,58 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Settings as SettingsIcon, User, Lock, Bell, Save, Loader2 } from 'lucide-react';
+import { userApi } from '../../services/userApi';
+import type { NotificationPreferences } from '../../types';
+
+const defaultNotifications: NotificationPreferences = {
+  taskAssigned: true,
+  taskCompleted: true,
+  jobFailed: true,
+  reportReady: true,
+};
 
 export const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
   const [profile, setProfile] = useState({
-    displayName: localStorage.getItem('username') || '',
+    username: localStorage.getItem('username') || '',
     email: '',
   });
-  const [notifications, setNotifications] = useState({
-    taskAssigned: true,
-    taskCompleted: true,
-    jobFailed: true,
-    reportReady: true,
-  });
+  const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '' });
+  const [notifications, setNotifications] = useState<NotificationPreferences>(defaultNotifications);
+
+  useEffect(() => {
+    Promise.all([userApi.me(), userApi.settings()])
+      .then(([profileResponse, settingsResponse]) => {
+        setProfile({ username: profileResponse.data.username, email: profileResponse.data.email });
+        setNotifications(settingsResponse.data);
+      })
+      .catch(() => setError('Unable to load profile settings.'));
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
-    await new Promise(r => setTimeout(r, 800));
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setError('');
+    try {
+      if (activeTab === 'profile') {
+        const response = await userApi.updateMe(profile.username, profile.email);
+        localStorage.setItem('username', response.data.username);
+      } else if (activeTab === 'security') {
+        if (!passwords.currentPassword || !passwords.newPassword) throw new Error('Enter both password fields.');
+        await userApi.changePassword(passwords.currentPassword, passwords.newPassword);
+        setPasswords({ currentPassword: '', newPassword: '' });
+      } else {
+        const response = await userApi.updateSettings(notifications);
+        setNotifications(response.data);
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save settings.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const tabs = [
@@ -58,13 +89,14 @@ export const Settings: React.FC = () => {
 
         {/* Content */}
         <div className="flex-1 bg-surface-container-lowest border border-outline-variant rounded-xl p-lg">
+          {error && <div className="mb-md p-sm rounded-lg bg-error-container text-on-error-container">{error}</div>}
           {activeTab === 'profile' && (
             <div className="space-y-md max-w-md">
               <h3 className="font-label-lg font-semibold text-on-surface">Profile Settings</h3>
               <div>
                 <label className="block font-label-md text-on-surface mb-xs">Display Name</label>
-                <input value={profile.displayName}
-                  onChange={e => setProfile(p => ({ ...p, displayName: e.target.value }))}
+                <input value={profile.username}
+                  onChange={e => setProfile(p => ({ ...p, username: e.target.value }))}
                   className="w-full px-sm py-[8px] border border-outline-variant rounded-md text-body-sm focus:border-primary focus:outline-none" />
               </div>
               <div>
@@ -93,14 +125,25 @@ export const Settings: React.FC = () => {
           {activeTab === 'security' && (
             <div className="space-y-md max-w-md">
               <h3 className="font-label-lg font-semibold text-on-surface">Security Settings</h3>
-              <p className="text-on-surface-variant font-body-sm">Password changes are managed through the backend API. Use your admin credentials to update security settings.</p>
+              <div>
+                <label className="block font-label-md text-on-surface mb-xs">Current Password</label>
+                <input type="password" value={passwords.currentPassword}
+                  onChange={event => setPasswords(value => ({ ...value, currentPassword: event.target.value }))}
+                  className="w-full px-sm py-[8px] border border-outline-variant rounded-md text-body-sm focus:border-primary focus:outline-none" />
+              </div>
+              <div>
+                <label className="block font-label-md text-on-surface mb-xs">New Password</label>
+                <input type="password" minLength={8} value={passwords.newPassword}
+                  onChange={event => setPasswords(value => ({ ...value, newPassword: event.target.value }))}
+                  className="w-full px-sm py-[8px] border border-outline-variant rounded-md text-body-sm focus:border-primary focus:outline-none" />
+              </div>
               <div className="p-md bg-primary-container/20 border border-primary/20 rounded-lg">
-                <p className="font-label-md text-on-surface">🔒 JWT tokens expire after 24 hours.</p>
+                <p className="font-label-md text-on-surface">JWT tokens expire after 24 hours.</p>
                 <p className="font-body-sm text-on-surface-variant mt-xs">You will be automatically logged out when your session expires.</p>
               </div>
-              <button onClick={() => { localStorage.removeItem('token'); window.location.href = '/login'; }}
+              <button onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
                 className="text-error hover:underline font-label-md text-body-sm">
-                Logout from all sessions
+                Log out of this browser
               </button>
             </div>
           )}

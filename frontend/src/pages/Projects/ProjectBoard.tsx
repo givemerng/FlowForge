@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { KanbanColumn } from '../../components/ui/KanbanColumn';
-import { Task } from '../../components/ui/TaskCard';
+import type { Task, TaskStatus, Label } from '../../types';
 import api from '../../services/api';
 import { taskApi } from '../../services/taskApi';
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCorners } from '@dnd-kit/core';
@@ -12,7 +12,7 @@ export const ProjectBoard: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [showLabelsModal, setShowLabelsModal] = useState(false);
-  const [labels, setLabels] = useState<{id: number, name: string, color: string}[]>([]);
+  const [labels, setLabels] = useState<Label[]>([]);
   const [newLabelName, setNewLabelName] = useState('');
   const [newLabelColor, setNewLabelColor] = useState('#3B82F6');
   
@@ -32,9 +32,9 @@ export const ProjectBoard: React.FC = () => {
 
       try {
         setError('');
-        const response = await api.get(`/projects/${projectId}/tasks`);
+        const response = await taskApi.getProjectTasks(Number(projectId));
         setTasks(response.data);
-        const labelsResponse = await api.get(`/projects/${projectId}/labels`);
+        const labelsResponse = await api.get<Label[]>(`/projects/${projectId}/labels`);
         setLabels(labelsResponse.data);
       } catch (error) {
         setError('Failed to load project tasks or labels.');
@@ -48,7 +48,7 @@ export const ProjectBoard: React.FC = () => {
   const handleCreateLabel = async () => {
     if (!newLabelName) return;
     try {
-      const response = await api.post(`/projects/${projectId}/labels`, { name: newLabelName, color: newLabelColor });
+      const response = await api.post<Label>(`/projects/${projectId}/labels`, { name: newLabelName, color: newLabelColor });
       setLabels([...labels, response.data]);
       setNewLabelName('');
     } catch (err) {
@@ -73,6 +73,7 @@ export const ProjectBoard: React.FC = () => {
   const todoTasks = tasks.filter(t => t.status === 'TODO');
   const inProgressTasks = tasks.filter(t => t.status === 'IN_PROGRESS');
   const reviewTasks = tasks.filter(t => t.status === 'REVIEW');
+  const blockedTasks = tasks.filter(t => t.status === 'BLOCKED');
   const doneTasks = tasks.filter(t => t.status === 'DONE');
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -80,28 +81,30 @@ export const ProjectBoard: React.FC = () => {
     if (!over) return;
 
     const taskId = active.id as number;
-    let newStatus = over.id as string; // if dropped directly on column
+    let newStatus = over.id as string;
     
     // if dropped on another task, find that task's status
-    if (newStatus !== 'TODO' && newStatus !== 'IN PROGRESS' && newStatus !== 'REVIEW' && newStatus !== 'DONE') {
+    if (!['TODO', 'IN PROGRESS', 'REVIEW', 'BLOCKED', 'DONE'].includes(newStatus)) {
        const overTask = tasks.find(t => t.id === over.id);
        if (overTask) newStatus = overTask.status;
     }
     
     // Map "IN PROGRESS" back to "IN_PROGRESS" enum value
     if (newStatus === 'IN PROGRESS') newStatus = 'IN_PROGRESS';
+    if (!['TODO', 'IN_PROGRESS', 'REVIEW', 'BLOCKED', 'DONE'].includes(newStatus)) return;
+    const targetStatus = newStatus as TaskStatus;
 
     const activeTask = tasks.find(t => t.id === taskId);
-    if (!activeTask || activeTask.status === newStatus) return;
+    if (!activeTask || activeTask.status === targetStatus) return;
 
     const previousStatus = activeTask.status;
 
     // Optimistic update
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: targetStatus } : t));
 
     try {
-      await taskApi.updateStatus(taskId, newStatus);
-    } catch (e) {
+      await taskApi.updateStatus(taskId, targetStatus);
+    } catch {
       // Revert on failure
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: previousStatus } : t));
     }
@@ -129,6 +132,7 @@ export const ProjectBoard: React.FC = () => {
               <KanbanColumn title="TODO" tasks={todoTasks} indicatorColor="bg-outline" />
               <KanbanColumn title="IN PROGRESS" tasks={inProgressTasks} indicatorColor="bg-primary-container" />
               <KanbanColumn title="REVIEW" tasks={reviewTasks} indicatorColor="bg-tertiary-container" />
+              <KanbanColumn title="BLOCKED" tasks={blockedTasks} indicatorColor="bg-error" />
               <KanbanColumn title="DONE" tasks={doneTasks} indicatorColor="bg-green-500" />
            </DndContext>
         )}

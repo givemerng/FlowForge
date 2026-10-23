@@ -1,7 +1,12 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: ${CONTAINER_LOG_MAX_SIZE:-10m}
+    max-file: ${CONTAINER_LOG_MAX_FILES:-5}
+
 services:
   mysql:
     image: mysql:8.0
-    container_name: flowforge-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-flowforge}
@@ -16,27 +21,28 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 120s
+    logging: *default-logging
 
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: flowforge-rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-flowforge-local-erlang-cookie}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+    logging: *default-logging
 
   redis:
     image: redis:7-alpine
-    container_name: flowforge-redis
     ports:
       - "6379:6379"
     healthcheck:
@@ -44,11 +50,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *default-logging
 
   java-api:
     build:
       context: ./backend
-    container_name: flowforge-api
     ports:
       - "8080:8080"
     environment:
@@ -61,8 +67,12 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
-      JWT_SECRET: ${JWT_SECRET:-dGVzdFNlY3JldEtleUZvckZsb3dGb3JnZVRlc3RpbmdQdXJwb3Nlc09ubHk=}
+      JWT_SECRET: ${JWT_SECRET:-}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      MANAGEMENT_PORT: 9091
+      PYTHON_SERVICE_URL: http://python-service:8000
     depends_on:
       mysql:
         condition: service_healthy
@@ -71,18 +81,30 @@ services:
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9091/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
       start_period: 60s
+    logging: *default-logging
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
+    ports:
+      - "5173:80"
+    depends_on:
+      java-api:
+        condition: service_healthy
+    logging: *default-logging
 
   python-service:
     build:
       context: ./python-service
-    container_name: flowforge-python
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
       MYSQL_HOST: mysql
@@ -90,6 +112,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-flowforge_user}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-flowforge_password}
       JOBS_QUEUE: flowforge.jobs
+      JOB_EVENTS_QUEUE: flowforge.job.events
     depends_on:
       mysql:
         condition: service_healthy
@@ -101,29 +124,36 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    logging: *default-logging
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: flowforge-prometheus
     ports:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}'
+    logging: *default-logging
 
   grafana:
     image: grafana/grafana:latest
-    container_name: flowforge-grafana
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
     depends_on:
       - prometheus
+    logging: *default-logging
 
 volumes:
   mysql_data:
   grafana_data:
+  prometheus_data:

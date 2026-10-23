@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../../services/api';
 import { AxiosError } from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 export const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -19,7 +19,9 @@ export const Login: React.FC = () => {
       const response = await api.post('/auth/login', { username, password });
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
-        // Set user info to some global state if necessary, or just redirect
+        localStorage.setItem('username', response.data.username);
+        localStorage.setItem('role', response.data.role);
+        localStorage.setItem('userId', String(response.data.id));
         navigate('/dashboard');
       }
     } catch (err) {
@@ -54,8 +56,9 @@ export const Login: React.FC = () => {
 
         <form onSubmit={handleLogin} className="space-y-md">
           <div>
-            <label className="block font-label-md text-label-md text-on-surface mb-xs">Username</label>
+            <label htmlFor="username" className="block font-label-md text-label-md text-on-surface mb-xs">Username</label>
             <input 
+              id="username"
               type="text" 
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -65,22 +68,22 @@ export const Login: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block font-label-md text-label-md text-on-surface mb-xs">Password</label>
+            <label htmlFor="password" className="block font-label-md text-label-md text-on-surface mb-xs">Password</label>
             <input 
+              id="password"
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-sm py-[8px] bg-surface-container-lowest border border-outline-variant rounded-md text-body-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
-              placeholder="••••••••"
+              placeholder="Enter your password"
               required
             />
           </div>
-          <div className="flex items-center justify-between mt-sm">
+          <div className="flex items-center mt-sm">
             <label className="flex items-center gap-xs cursor-pointer">
               <input type="checkbox" className="rounded border-outline-variant text-primary focus:ring-primary" />
               <span className="font-body-sm text-body-sm text-on-surface-variant">Remember me</span>
             </label>
-            <a href="#" className="font-label-md text-label-md text-primary hover:underline">Forgot password?</a>
           </div>
           <button 
             type="submit" 
@@ -92,7 +95,7 @@ export const Login: React.FC = () => {
         </form>
         
         <p className="font-body-sm text-body-sm text-center text-on-surface-variant mt-lg">
-          Don't have an account? <a href="#" className="text-primary hover:underline font-semibold">Register here</a>
+          Don't have an account? <Link to="/register" className="text-primary hover:underline font-semibold">Register here</Link>
         </p>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { projectApi } from '../../services/projectApi';
 import { analyticsApi } from '../../services/analyticsApi';
 import { notificationApi } from '../../services/notificationApi';
 import { BarChart3, CheckCircle2, Clock, AlertTriangle, Folder, Bell, Plus, Loader2 } from 'lucide-react';
+import type { AnalyticsOverview, Notification, Project } from '../../types';
 
 interface Stat { label: string; value: number | string; icon: React.ElementType; color: string; }
 
@@ -20,11 +21,12 @@ const StatCard = ({ label, value, icon: Icon, color }: Stat) => (
 );
 
 export const Dashboard: React.FC = () => {
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<AnalyticsOverview | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const canCreateProject = localStorage.getItem('role') !== 'MEMBER';
 
   useEffect(() => {
     const load = async () => {
@@ -37,7 +39,7 @@ export const Dashboard: React.FC = () => {
         setAnalytics(analyticsRes.data);
         setProjects(projectsRes.data.slice(0, 5));
         setNotifications(notifRes.data.slice(0, 5));
-      } catch (e: any) {
+      } catch {
         setError('Failed to load dashboard data.');
       } finally {
         setLoading(false);
@@ -75,9 +77,11 @@ export const Dashboard: React.FC = () => {
           <h1 className="font-h1 text-h1 font-bold text-on-surface">Dashboard</h1>
           <p className="text-on-surface-variant font-body-sm mt-xs">Welcome back. Here's what's happening.</p>
         </div>
-        <Link to="/projects" className="flex items-center gap-xs bg-primary text-on-primary px-md py-sm rounded-lg text-label-md font-label-md hover:bg-primary/90 transition-colors">
-          <Plus size={16} /> New Project
-        </Link>
+        {canCreateProject && (
+          <Link to="/projects" className="flex items-center gap-xs bg-primary text-on-primary px-md py-sm rounded-lg text-label-md font-label-md hover:bg-primary/90 transition-colors">
+            <Plus size={16} /> New Project
+          </Link>
+        )}
       </div>
 
       {/* Stats */}

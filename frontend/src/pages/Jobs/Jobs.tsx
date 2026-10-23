@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { jobApi } from '../../services/jobApi';
 import { Loader2, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
+import type { Job } from '../../types';
 
 const StatusBadge = ({ status }: { status: string }) => {
   const map: Record<string, string> = {
@@ -23,39 +24,44 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 export const Jobs: React.FC = () => {
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState<number | null>(null);
   const { connected, subscribe } = useWebSocket();
+  const jobIds = jobs.map(job => job.id).sort((a, b) => a - b).join(',');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const res = await jobApi.getAll();
       setJobs(res.data);
-    } catch {} finally { setLoading(false); }
-  };
+    } catch { setError('Unable to load background jobs.'); } finally { setLoading(false); }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  const hasPendingJob = jobs.some(job => job.status === 'QUEUED' || job.status === 'PROCESSING');
 
   useEffect(() => {
-    if (connected) {
-      subscribe('/topic/jobs', (updatedJob) => {
-        setJobs(prev => {
-          const exists = prev.find(j => j.id === updatedJob.id);
-          if (exists) {
-            return prev.map(j => j.id === updatedJob.id ? updatedJob : j);
-          } else {
-            return [updatedJob, ...prev];
-          }
-        });
-      });
-    }
-  }, [connected]);
+    if (!hasPendingJob) return;
+    const timer = window.setInterval(() => { void load(); }, 2000);
+    return () => window.clearInterval(timer);
+  }, [hasPendingJob, load]);
+
+  useEffect(() => {
+    if (!connected) return;
+    const subscriptions = jobIds.split(',').filter(Boolean).map(jobId =>
+      subscribe<Job>(`/topic/jobs/${jobId}`, (updatedJob) => {
+        setJobs(prev => prev.map(job => job.id === updatedJob.id ? updatedJob : job));
+      })
+    );
+    return () => subscriptions.forEach(subscription => subscription?.unsubscribe());
+  }, [connected, subscribe, jobIds]);
 
   const handleRetry = async (id: number) => {
     setRetrying(id);
     try { await jobApi.retry(id); await load(); }
-    catch {} finally { setRetrying(null); }
+    catch { setError('Unable to retry this job.'); } finally { setRetrying(null); }
   };
 
   return (
@@ -77,6 +83,8 @@ export const Jobs: React.FC = () => {
         </button>
       </div>
 
+      {error && <div className="mb-md p-sm rounded-lg bg-error-container text-on-error-container">{error}</div>}
+
       {loading ? (
         <div className="flex justify-center py-xl"><Loader2 size={32} className="animate-spin text-primary" /></div>
       ) : jobs.length === 0 ? (
@@ -95,7 +103,7 @@ export const Jobs: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant">
-              {jobs.map((j: any) => (
+              {jobs.map(j => (
                 <tr key={j.id} className="hover:bg-surface-container/50 transition-colors">
                   <td className="px-md py-sm font-mono text-on-surface-variant">#{j.id}</td>
                   <td className="px-md py-sm font-label-md text-on-surface">{j.type}</td>
@@ -103,7 +111,7 @@ export const Jobs: React.FC = () => {
                   <td className="px-md py-sm text-on-surface-variant">{j.attemptCount}/3</td>
                   <td className="px-md py-sm text-on-surface-variant">{new Date(j.createdAt).toLocaleString()}</td>
                   <td className="px-md py-sm">
-                    {j.status === 'FAILED' && j.attemptCount < 3 && (
+                    {j.status === 'FAILED' && (
                       <button onClick={() => handleRetry(j.id)} disabled={retrying === j.id}
                         className="flex items-center gap-xs text-primary hover:underline text-label-md disabled:opacity-50">
                         {retrying === j.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}

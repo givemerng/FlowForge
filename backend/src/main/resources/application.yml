@@ -1,6 +1,8 @@
 spring:
   application:
     name: flowforge
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/flowforge?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
     username: ${SPRING_DATASOURCE_USERNAME:flowforge_user}
@@ -8,12 +10,16 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: ${HIBERNATE_SHOW_SQL:false}
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -29,7 +35,7 @@ spring:
 logging:
   level:
     root: INFO
-    com.flowforge: DEBUG
+    com.flowforge: ${FLOWFORGE_LOG_LEVEL:INFO}
     org.springframework.security: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
@@ -38,21 +44,23 @@ logging:
     name: logs/flowforge.log
 
 management:
+  server:
+    port: ${MANAGEMENT_PORT:9091}
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics
+        include: health,prometheus
   endpoint:
     health:
       probes:
         enabled: true
-      show-details: always
+      show-details: never
 
 server:
   port: 8080
   error:
-    include-message: always
-    include-binding-errors: always
+    include-message: never
+    include-binding-errors: never
 
 springdoc:
   api-docs:
@@ -70,3 +78,7 @@ flowforge:
     job-events-queue: ${JOB_EVENTS_QUEUE:flowforge.job.events}
   rate-limit:
     requests-per-minute: ${RATE_LIMIT_REQUESTS_PER_MINUTE:100}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  intelligence:
+    base-url: ${PYTHON_SERVICE_URL:http://localhost:8000}

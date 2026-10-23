@@ -21,8 +21,11 @@ describe('TaskCard', () => {
     title: 'Test Task Creation',
     status: 'TODO',
     priority: 'HIGH',
+    projectId: 1,
     createdAt: new Date().toISOString(),
-    assignedTo: { id: 1, username: 'testuser' }
+    updatedAt: new Date().toISOString(),
+    labels: [],
+    assignedTo: { id: 1, username: 'testuser', email: 'test@example.com', role: 'MEMBER' }
   };
 
   it('renders task details correctly', () => {

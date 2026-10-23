@@ -8,8 +8,6 @@ import com.flowforge.entity.User;
 import com.flowforge.exception.ResourceNotFoundException;
 import com.flowforge.repository.ProjectMemberRepository;
 import com.flowforge.repository.ProjectRepository;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,30 +17,37 @@ import java.util.List;
 public class ProjectService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
+    private final ProjectAccessService projectAccessService;
     private final CurrentUserService currentUserService;
     private final AuditService auditService;
 
-    public ProjectService(ProjectRepository projectRepository, ProjectMemberRepository projectMemberRepository, CurrentUserService currentUserService, AuditService auditService) {
+    public ProjectService(ProjectRepository projectRepository, ProjectMemberRepository projectMemberRepository,
+                          ProjectAccessService projectAccessService, CurrentUserService currentUserService,
+                          AuditService auditService) {
         this.projectRepository = projectRepository;
         this.projectMemberRepository = projectMemberRepository;
+        this.projectAccessService = projectAccessService;
         this.currentUserService = currentUserService;
         this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
-    @Cacheable("projects")
     public List<ProjectResponse> getProjects() {
-        return projectRepository.findAll().stream().map(ProjectResponse::from).toList();
+        User user = currentUserService.requireCurrentUser();
+        List<Project> projects = user.getRole() == User.Role.ADMIN
+                ? projectRepository.findAll()
+                : projectRepository.findAccessibleByUserId(user.getId());
+        return projects.stream().map(ProjectResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "project", key = "#id")
     public ProjectResponse getProject(Long id) {
+        User user = currentUserService.requireCurrentUser();
+        projectAccessService.requireAccess(id, user);
         return ProjectResponse.from(requireProject(id));
     }
 
     @Transactional
-    @CacheEvict(value = {"projects", "project"}, allEntries = true)
     public ProjectResponse createProject(ProjectRequest request) {
         User owner = currentUserService.requireCurrentUser();
         Project project = new Project();
@@ -62,8 +67,8 @@ public class ProjectService {
     }
 
     @Transactional
-    @CacheEvict(value = {"projects", "project"}, allEntries = true)
     public ProjectResponse updateProject(Long id, ProjectRequest request) {
+        projectAccessService.requireManager(id, currentUserService.requireCurrentUser());
         Project project = requireProject(id);
         project.setName(request.getName());
         project.setDescription(request.getDescription());
@@ -73,8 +78,8 @@ public class ProjectService {
     }
 
     @Transactional
-    @CacheEvict(value = {"projects", "project"}, allEntries = true)
     public void deleteProject(Long id) {
+        projectAccessService.requireManager(id, currentUserService.requireCurrentUser());
         Project project = requireProject(id);
         projectRepository.delete(project);
         auditService.record(currentUserService.requireCurrentUser(), "PROJECT_DELETED", "Project", id, null);
@@ -85,12 +90,4 @@ public class ProjectService {
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
     }
 
-    public void checkProjectAccess(Long projectId, User user) {
-        Project project = requireProject(projectId);
-        // Simple check: if not admin/manager, verify they are a member
-        if (user.getRole() == User.Role.MEMBER) {
-            projectMemberRepository.findByProjectIdAndUserId(projectId, user.getId())
-                    .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Access denied"));
-        }
-    }
 }

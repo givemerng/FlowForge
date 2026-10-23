@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "notifications", indexes = {
-        @Index(name = "idx_notifications_user_read", columnList = "user_id, read")
+        @Index(name = "idx_notifications_user_read", columnList = "user_id, is_read")
 })
 public class Notification {
     @Id
@@ -24,7 +24,7 @@ public class Notification {
     @Column(columnDefinition = "TEXT")
     private String body;
 
-    @Column(nullable = false)
+    @Column(name = "is_read", nullable = false)
     private boolean read = false;
 
     @CreationTimestamp

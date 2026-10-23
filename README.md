@@ -21,9 +21,9 @@ React Frontend  →  Spring Boot API  →  MySQL 8
 | Layer | Technology |
 |---|---|
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS |
-| Backend API | Java 17, Spring Boot 3.2, Spring Security, JWT |
-| Database | MySQL 8.0 (JPA/Hibernate, auto-migrated) |
-| Cache | Redis 7 (project/analytics caching, rate limiting) |
+| Backend API | Java 21, Spring Boot 3.2, Spring Security, JWT |
+| Database | MySQL 8.0 (JPA/Hibernate, Flyway migrations) |
+| Cache | Redis 7 (rate limiting) |
 | Message Broker | RabbitMQ 3 (async job queue) |
 | Background Workers | Python 3.11, FastAPI, SQLAlchemy |
 | Monitoring | Spring Actuator, Prometheus, Grafana |
@@ -36,13 +36,13 @@ React Frontend  →  Spring Boot API  →  MySQL 8
 
 ### Prerequisites
 - Docker Desktop
-- (Optional) Node.js 18+ and Java 17+ for local development
+- (Optional) Node.js 20+ and Java 21 for local development
 
 ### 1. Configure environment
 
 ```bash
 cp .env.example .env
-# Edit .env with your secrets (especially JWT_SECRET)
+# Edit .env with your secrets (JWT_SECRET is required)
 ```
 
 ### 2. Start all services
@@ -58,17 +58,17 @@ docker compose up -d
 | Frontend | http://localhost:5173 | - |
 | Backend API | http://localhost:8080 | - |
 | API Docs (Swagger) | http://localhost:8080/swagger-ui.html | - |
-| Python Service | http://localhost:8000 | - |
+| Python worker | Internal Compose network only | - |
 | RabbitMQ Dashboard | http://localhost:15672 | guest / guest |
 | Grafana | http://localhost:3000 | admin / admin |
 | Prometheus | http://localhost:9090 | - |
 
 ### 4. Seed demo data (optional)
 
-Start the Java API with the `dev` profile to auto-seed users, projects, and tasks:
+The Compose stack defaults to the production profile and does not create demo accounts. To seed local demo data, set `SPRING_PROFILES_ACTIVE=dev` in `.env`, then start the stack:
 
 ```bash
-SPRING_PROFILES_ACTIVE=dev docker compose up java-api
+docker compose up -d
 ```
 
 **Demo accounts (dev only — never use in production):**
@@ -102,7 +102,7 @@ FlowForge uses stateless JWT authentication.
 | Analytics | `/api/analytics/overview`, `/api/analytics/project/{id}` |
 | Notifications | `/api/notifications`, `/api/notifications/read-all` |
 | Search | `/api/search?q=query` |
-| Health | `/actuator/health` |
+| Monitoring health | `/api/monitoring/health` (authenticated) |
 
 Full documentation: http://localhost:8080/swagger-ui.html
 
@@ -116,7 +116,7 @@ Full documentation: http://localhost:8080/swagger-ui.html
 4. Python worker consumes the message
 5. Worker checks idempotency key — skips if already processed
 6. Worker computes result and updates `Job` status to `COMPLETED`
-7. Frontend polls for job status update
+7. Java publishes a STOMP event and the frontend updates in real time
 
 **Job types:** `REPORT`, `RISK`, `ANALYTICS`
 **Max retries:** 3 (tracked in `JobAttempt` table)
@@ -148,19 +148,19 @@ The Python service implements a deterministic, explainable risk scoring algorith
 
 ---
 
-## Redis Caching
+## Redis
 
-- `GET /api/projects` — cached under `"projects"` key
-- `GET /api/projects/{id}` — cached under `"project::{id}"`
-- Cache is evicted on create/update/delete
-- Rate limiting: 100 requests/minute per user (IP-based fallback)
+- Rate limiting: 100 requests/minute per user with an IP fallback.
+- Project and task reads are membership-scoped; administrators can access all projects.
 
 ---
 
 ## Monitoring
 
-- Spring Boot Actuator exposed: `/actuator/health`, `/actuator/metrics`, `/actuator/prometheus`
+- Spring Boot Actuator exposes only `/actuator/health` and `/actuator/prometheus` on the internal management port `9091`.
+- The authenticated monitoring UI reads `/api/monitoring/health`; the management port is not published by Compose.
 - Prometheus scrapes metrics every 15 seconds from both Java API and Python service
+- Python metrics include RabbitMQ connectivity and job outcomes
 - Grafana dashboards available at http://localhost:3000
 
 ---
@@ -176,8 +176,9 @@ mvn test
 ### Python (Pytest)
 ```bash
 cd python-service
-pip install -r requirements.txt
-pytest tests/ -v
+python -m venv .venv
+.venv/Scripts/python -m pip install -r requirements-dev.txt
+.venv/Scripts/python -m pytest tests/ -v
 ```
 
 ### Frontend (React Testing Library)
@@ -185,6 +186,16 @@ pytest tests/ -v
 cd frontend
 npm test
 ```
+
+### End-to-end (Playwright + Docker Compose)
+```bash
+docker compose -f docker-compose.yml -f docker-compose.e2e.yml up --build --wait
+cd frontend
+npx playwright install chromium
+npm run test:e2e
+```
+
+The E2E override enables dev-only seed accounts without changing the production-default stack. The test proves login, project and task creation, queued report processing by the Python worker, WebSocket status delivery, and the completed report in the UI.
 
 ---
 
@@ -205,9 +216,30 @@ cd python-service && uvicorn app.main:app --reload --port 8000
 
 ## Future Improvements
 
-- WebSocket real-time job status updates (Spring STOMP configured)
-- Drag-and-drop Kanban board
 - Machine learning model replacing the rule-based risk engine
 - Multi-tenant organization support
 - OAuth2/SSO integration
 - Mobile application
+
+---
+
+## Production Notes
+
+- Generate a production-only environment file with cryptographically random secrets:
+
+```bash
+python ops/generate_env.py --domain flowforge.example.com --email ops@example.com
+```
+
+- Point the domain's DNS records at the server, then start the hardened stack:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
+```
+
+- Caddy terminates HTTPS and renews certificates automatically. MySQL, Redis, RabbitMQ, Prometheus, Grafana, the Java API, and the frontend are not directly published by the production override.
+- MySQL is dumped daily to the `mysql_backups` volume. Dumps older than `BACKUP_RETENTION_DAYS` are removed automatically. Restore with `mysql --host=mysql --user="$MYSQL_USER" "$MYSQL_DATABASE" < backup.sql` from a MySQL client attached to the Compose network.
+- Prometheus data defaults to 30-day retention in `prometheus_data`; container JSON logs rotate at 10 MB with five retained files. Both limits are environment configurable.
+- Keep `SPRING_PROFILES_ACTIVE=prod`; the `dev` profile and its demo credentials are enabled only by the explicit E2E override.
+- Add schema changes as new files under `backend/src/main/resources/db/migration`; Hibernate only validates the schema.
+- GitHub Actions runs backend, frontend, Python, Compose validation, and the complete Playwright flow on every push and pull request.
