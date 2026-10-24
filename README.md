@@ -1,245 +1,194 @@
 # FlowForge
 
-**Intelligent Job & Workflow Management Platform**
+FlowForge is a full-stack project, task, background-job, reporting, and risk-analysis platform. It combines a React frontend, a secured Spring Boot API, asynchronous Python workers, and production-oriented Docker infrastructure.
 
-A full-stack enterprise application for managing projects, tasks, background jobs, and intelligent risk analysis.
+## Current Status
 
----
+The main application flow is implemented and continuously verified:
 
-## Architecture
+1. Authenticate with JWT.
+2. Create a project and tasks.
+3. Request an asynchronous report.
+4. Process the job through RabbitMQ and the Python worker.
+5. Persist the result and deliver a real-time UI update.
 
-```
-React Frontend  →  Spring Boot API  →  MySQL 8
-                        ↓
-                    RabbitMQ
-                        ↓
-                  Python Workers  →  Risk/Workload Analysis
-                        ↓
-                  Job Status Update
-```
+The repository includes authorization boundary tests, Flyway migration tests against MySQL 8, frontend unit tests, Python tests, and a Playwright end-to-end test. GitHub Actions runs the complete suite on every push and pull request.
+
+## Technology
 
 | Layer | Technology |
 |---|---|
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS |
-| Backend API | Java 21, Spring Boot 3.2, Spring Security, JWT |
-| Database | MySQL 8.0 (JPA/Hibernate, Flyway migrations) |
-| Cache | Redis 7 (rate limiting) |
-| Message Broker | RabbitMQ 3 (async job queue) |
-| Background Workers | Python 3.11, FastAPI, SQLAlchemy |
-| Monitoring | Spring Actuator, Prometheus, Grafana |
-| API Documentation | SpringDoc OpenAPI (Swagger UI) |
-| Infrastructure | Docker, Docker Compose |
+| Backend | Java 21, Spring Boot 3.2, Spring Security, JWT |
+| Data | MySQL 8, Spring Data JPA, Flyway |
+| Messaging | RabbitMQ 3, STOMP WebSockets |
+| Worker | Python 3.11, FastAPI, SQLAlchemy |
+| Cache and limits | Redis 7 |
+| Observability | Actuator, Prometheus, Grafana |
+| Infrastructure | Docker Compose, Caddy |
 
----
+```text
+React UI -> Spring Boot API -> MySQL
+                |              |
+                v              |
+             RabbitMQ ---------+
+                |
+                v
+          Python worker
+                |
+                v
+        job event -> WebSocket -> React UI
+```
+
+See [Architecture](docs/ARCHITECTURE.md) for component boundaries and request flows.
 
 ## Quick Start
 
-### Prerequisites
-- Docker Desktop
-- (Optional) Node.js 20+ and Java 21 for local development
+### Requirements
 
-### 1. Configure environment
+- Docker Desktop with Compose v2
+- Optional for local development: Java 21, Node.js 20+, Python 3.11+
+
+### Start the stack
 
 ```bash
 cp .env.example .env
-# Edit .env with your secrets (JWT_SECRET is required)
+docker compose up -d --build --wait
 ```
 
-### 2. Start all services
+PowerShell equivalent:
 
-```bash
-docker compose up -d
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build --wait
 ```
 
-### 3. Access the application
+The base Compose file uses development-safe defaults, but `JWT_SECRET` should be changed before sharing an environment.
 
-| Service | URL | Credentials |
-|---|---|---|
-| Frontend | http://localhost:5173 | - |
-| Backend API | http://localhost:8080 | - |
-| API Docs (Swagger) | http://localhost:8080/swagger-ui.html | - |
-| Python worker | Internal Compose network only | - |
-| RabbitMQ Dashboard | http://localhost:15672 | guest / guest |
-| Grafana | http://localhost:3000 | admin / admin |
-| Prometheus | http://localhost:9090 | - |
+### Local services
 
-### 4. Seed demo data (optional)
-
-The Compose stack defaults to the production profile and does not create demo accounts. To seed local demo data, set `SPRING_PROFILES_ACTIVE=dev` in `.env`, then start the stack:
-
-```bash
-docker compose up -d
-```
-
-**Demo accounts (dev only — never use in production):**
-- `admin / admin123!` — full access
-- `manager / manager123!` — project management
-- `alice / alice123!` — member
-
----
-
-## Authentication
-
-FlowForge uses stateless JWT authentication.
-
-- `POST /api/auth/register` — create account
-- `POST /api/auth/login` — returns a JWT token (24h expiry by default)
-- All other endpoints require `Authorization: Bearer <token>`
-- Role-based access: `ADMIN`, `MANAGER`, `MEMBER`
-
----
-
-## API Overview
-
-| Domain | Endpoint |
+| Service | Address |
 |---|---|
-| Auth | `/api/auth/register`, `/api/auth/login` |
-| Projects | `/api/projects` (CRUD) |
-| Tasks | `/api/projects/{id}/tasks`, `/api/tasks/{id}` |
-| Comments | `/api/tasks/{id}/comments` |
-| Jobs | `/api/jobs`, `/api/jobs/{id}/retry` |
-| Reports | `/api/reports` (async via RabbitMQ) |
-| Analytics | `/api/analytics/overview`, `/api/analytics/project/{id}` |
-| Notifications | `/api/notifications`, `/api/notifications/read-all` |
-| Search | `/api/search?q=query` |
-| Monitoring health | `/api/monitoring/health` (authenticated) |
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:8080/api |
+| Swagger UI | http://localhost:8080/swagger-ui.html |
+| MySQL | localhost:3306 |
+| Redis | localhost:6379 |
+| RabbitMQ management | http://localhost:15672 |
+| Grafana | http://localhost:3000 |
+| Prometheus | http://localhost:9090 |
 
-Full documentation: http://localhost:8080/swagger-ui.html
+The Python worker and Actuator management port remain internal to the Compose network. The production override also removes the development host ports for MySQL, Redis, RabbitMQ, Prometheus, Grafana, the API, and the frontend.
 
----
+### Optional demo accounts
 
-## Background Jobs
+Demo data is disabled by default. Enable it only for local development by setting this in `.env`:
 
-1. User requests a report/risk analysis from the frontend
-2. Java API creates a `Job` record in MySQL (status: `QUEUED`)
-3. Java API publishes a message to the `flowforge.jobs` RabbitMQ queue
-4. Python worker consumes the message
-5. Worker checks idempotency key — skips if already processed
-6. Worker computes result and updates `Job` status to `COMPLETED`
-7. Java publishes a STOMP event and the frontend updates in real time
-
-**Job types:** `REPORT`, `RISK`, `ANALYTICS`
-**Max retries:** 3 (tracked in `JobAttempt` table)
-
----
-
-## Intelligent Risk Analysis
-
-The Python service implements a deterministic, explainable risk scoring algorithm:
-
-**Risk Factors:**
-- Task priority (CRITICAL/HIGH add significant score)
-- Deadline proximity (overdue adds 40 points, within 24h adds 30)
-- Task status (BLOCKED adds 25 points)
-- Assignee workload (high active task count adds score)
-
-**Output:**
-```json
-{
-  "risk": "HIGH",
-  "riskScore": 87,
-  "reasons": [
-    "Task has critical priority",
-    "Task is overdue by 3 day(s)",
-    "Assignee has high workload (9 active tasks)"
-  ]
-}
+```dotenv
+SPRING_PROFILES_ACTIVE=dev
 ```
 
----
+Then restart the stack. The development-only accounts are:
 
-## Redis
+| Username | Password | Role |
+|---|---|---|
+| `admin` | `admin123!` | Administrator |
+| `manager` | `manager123!` | Manager |
+| `alice` | `alice123!` | Member |
 
-- Rate limiting: 100 requests/minute per user with an IP fallback.
-- Project and task reads are membership-scoped; administrators can access all projects.
+Never enable the `dev` profile in production.
 
----
+## Major Capabilities
 
-## Monitoring
+- JWT authentication and role-based access.
+- Project membership enforcement for project, task, label, comment, report, job, analytics, and ID-based lookups.
+- Kanban project boards, task assignment, labels, comments, and notifications.
+- Asynchronous report jobs with retry tracking and transaction-safe publication.
+- Deterministic task risk and workload analysis.
+- Persisted profile, password, and notification settings.
+- Database-side analytics aggregation and bounded job/report/audit pagination.
+- Real-time job updates over authenticated WebSockets.
+- OpenAPI documentation and operational dashboards.
 
-- Spring Boot Actuator exposes only `/actuator/health` and `/actuator/prometheus` on the internal management port `9091`.
-- The authenticated monitoring UI reads `/api/monitoring/health`; the management port is not published by Compose.
-- Prometheus scrapes metrics every 15 seconds from both Java API and Python service
-- Python metrics include RabbitMQ connectivity and job outcomes
-- Grafana dashboards available at http://localhost:3000
+## API Summary
 
----
+| Domain | Main endpoints |
+|---|---|
+| Authentication | `/api/auth/register`, `/api/auth/login` |
+| Projects | `/api/projects` |
+| Tasks | `/api/projects/{projectId}/tasks`, `/api/tasks/{taskId}` |
+| Comments and labels | `/api/tasks/{taskId}/comments`, `/api/tasks/{taskId}/labels` |
+| Jobs and reports | `/api/jobs`, `/api/reports` |
+| Analytics | `/api/analytics/overview`, `/api/analytics/project/{projectId}` |
+| Intelligence | `/api/insights/tasks/{taskId}/risk` |
+| Notifications | `/api/notifications` |
+| User settings | `/api/users/me`, `/api/users/me/settings`, `/api/users/me/password` |
+| Monitoring | `/api/monitoring/health` |
+
+Use Swagger UI for request and response schemas.
 
 ## Testing
 
-### Java (JUnit + Spring Boot Test)
-```bash
-cd backend
-mvn test
-```
+Run the complete local checks as documented in [Testing](docs/TESTING.md).
 
-### Python (Pytest)
 ```bash
+# Backend
+cd backend && mvn test
+
+# Frontend
+cd frontend && npm ci && npm run lint && npm test && npm run build
+
+# Python
 cd python-service
 python -m venv .venv
-.venv/Scripts/python -m pip install -r requirements-dev.txt
-.venv/Scripts/python -m pytest tests/ -v
+# activate the environment, then:
+pip install -r requirements-dev.txt
+pytest -q
 ```
 
-### Frontend (React Testing Library)
-```bash
-cd frontend
-npm test
-```
+The end-to-end suite uses `docker-compose.e2e.yml`, which enables isolated demo data without weakening the default runtime profile.
 
-### End-to-end (Playwright + Docker Compose)
-```bash
-docker compose -f docker-compose.yml -f docker-compose.e2e.yml up --build --wait
-cd frontend
-npx playwright install chromium
-npm run test:e2e
-```
+## Production Deployment
 
-The E2E override enables dev-only seed accounts without changing the production-default stack. The test proves login, project and task creation, queued report processing by the Python worker, WebSocket status delivery, and the completed report in the UI.
-
----
-
-## Development Workflow
-
-```bash
-# Backend dev
-cd backend && mvn spring-boot:run -Dspring.profiles.active=dev
-
-# Frontend dev
-cd frontend && npm run dev
-
-# Python worker dev
-cd python-service && uvicorn app.main:app --reload --port 8000
-```
-
----
-
-## Future Improvements
-
-- Machine learning model replacing the rule-based risk engine
-- Multi-tenant organization support
-- OAuth2/SSO integration
-- Mobile application
-
----
-
-## Production Notes
-
-- Generate a production-only environment file with cryptographically random secrets:
+Production uses required secrets, automatic TLS, internal-only service ports, database backups, metric retention, and log rotation.
 
 ```bash
 python ops/generate_env.py --domain flowforge.example.com --email ops@example.com
+docker compose --env-file .env.production \
+  -f docker-compose.yml \
+  -f docker-compose.prod.yml \
+  up -d --build --wait
 ```
 
-- Point the domain's DNS records at the server, then start the hardened stack:
+Before starting, point the selected domain to the server and permit inbound TCP ports `80` and `443` plus UDP `443` if HTTP/3 is desired. See [Production Deployment](docs/DEPLOYMENT.md) for backup, restore, monitoring, upgrade, and rollback procedures.
+
+## Development
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
+# Backend
+cd backend
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+
+# Frontend
+cd frontend
+npm ci
+npm run dev
+
+# Python API/worker service
+cd python-service
+uvicorn app.main:app --reload --port 8000
 ```
 
-- Caddy terminates HTTPS and renews certificates automatically. MySQL, Redis, RabbitMQ, Prometheus, Grafana, the Java API, and the frontend are not directly published by the production override.
-- MySQL is dumped daily to the `mysql_backups` volume. Dumps older than `BACKUP_RETENTION_DAYS` are removed automatically. Restore with `mysql --host=mysql --user="$MYSQL_USER" "$MYSQL_DATABASE" < backup.sql` from a MySQL client attached to the Compose network.
-- Prometheus data defaults to 30-day retention in `prometheus_data`; container JSON logs rotate at 10 MB with five retained files. Both limits are environment configurable.
-- Keep `SPRING_PROFILES_ACTIVE=prod`; the `dev` profile and its demo credentials are enabled only by the explicit E2E override.
-- Add schema changes as new files under `backend/src/main/resources/db/migration`; Hibernate only validates the schema.
-- GitHub Actions runs backend, frontend, Python, Compose validation, and the complete Playwright flow on every push and pull request.
+Database schema changes must be added as versioned migrations under `backend/src/main/resources/db/migration`. Hibernate runs with schema validation rather than schema mutation.
+
+## Documentation
+
+- [Architecture and security model](docs/ARCHITECTURE.md)
+- [Testing and CI](docs/TESTING.md)
+- [Production deployment and operations](docs/DEPLOYMENT.md)
+- [Troubleshooting history](error_log.md)
+- [Frontend development](frontend/README.md)
+
+## Roadmap
+
+Potential future product extensions include organization-level multi-tenancy, OAuth2/SSO, a learned risk model, and native mobile clients. These are enhancements rather than current functional blockers.

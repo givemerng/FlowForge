@@ -1,27 +1,47 @@
-# React + TypeScript + Vite
+# FlowForge Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The frontend is a React 18 and TypeScript application built with Vite and Tailwind CSS. It provides role-aware navigation, project and task management, analytics, reporting, monitoring, notifications, and persisted user settings.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node.js 20 or newer
+- npm
+- A FlowForge backend at `VITE_API_BASE_URL`
 
-## Expanding the ESLint configuration
+## Commands
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
-
-- Configure the top-level `parserOptions` property like this:
-
-```js
-   parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-   },
+```bash
+npm ci
+npm run dev       # local Vite server
+npm run lint      # ESLint with zero warnings
+npm test          # Vitest unit tests
+npm run build     # TypeScript and production bundle
+npm run test:e2e  # Playwright against the Compose stack
 ```
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+## Configuration
+
+The default development API address is `http://localhost:8080/api`. Override it through `VITE_API_BASE_URL` when needed.
+
+The production container is built with `VITE_API_BASE_URL=/api`, allowing Caddy to serve the frontend and API from the same HTTPS origin.
+
+## Structure
+
+| Path | Purpose |
+|---|---|
+| `src/pages` | Route-level application screens |
+| `src/components` | Shared layout and UI components |
+| `src/services` | Typed API clients |
+| `src/hooks` | Shared hooks, including WebSocket handling |
+| `src/types.ts` | Shared domain and API types |
+| `tests` | Playwright end-to-end scenarios |
+
+## Authentication
+
+The login response is stored in browser local storage and attached to API requests as a bearer token. Navigation visibility is role-aware, but backend authorization remains the security boundary. WebSocket connections also include the JWT.
+
+## Testing
+
+Unit tests use Vitest, React Testing Library, and jsdom. The current coverage includes task rendering, role-based sidebar visibility, and login success/error behavior.
+
+The Playwright scenario validates the complete flow through Docker Compose: login, project creation, task creation, report submission, Python worker processing, and completed report display.

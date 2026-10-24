@@ -32,7 +32,7 @@ This file documents all errors encountered during the development and deployment
 ### 6. Broken Authentication Links
 - **Error**: Clicking "Register here" or "Forgot password" on the Login page did nothing.
 - **Cause**: Registration used a placeholder anchor, and no password-reset flow exists.
-- **Fix**: Routed registration to `/register` and replaced the non-functional reset link with non-clickable guidance to contact an administrator.
+- **Fix**: Routed registration to `/register` and removed the unsupported password-reset control.
 
 ### 7. Java Backend Crash on Startup (SQL Syntax Error)
 - **Error**: `java.sql.SQLSyntaxErrorException: You have an error in your SQL syntax... near 'read,title,user_id)'`
