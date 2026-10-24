@@ -64,5 +64,15 @@ This file documents all errors encountered during the development and deployment
 - **Cause**: RabbitMQ received the message before the database transaction that created the job committed, so the worker's idempotency lookup could not find it.
 - **Fix**: Added `JobQueuePublisher` to publish only after a successful transaction commit and added a regression test. The full Playwright flow now passes.
 
+### 13. Existing Database Failed Flyway Baseline
+- **Error**: The API stopped during startup because migration V1 tried to create tables that already existed.
+- **Cause**: A pre-Flyway database was baselined at version `0`, so Flyway correctly attempted V1 instead of treating the existing schema as the V1 baseline.
+- **Fix**: Changed the existing-schema baseline to version `1`. Empty databases still execute V1, while legacy schemas continue with V2 and later migrations.
+
+### 14. RabbitMQ Erlang Cookie Permission Failure
+- **Error**: RabbitMQ exited with `Error when reading /var/lib/rabbitmq/.erlang.cookie: eacces`, leaving dependent API and frontend containers unstarted.
+- **Cause**: A persisted anonymous RabbitMQ volume contained a root-owned cookie file that the `rabbitmq` process could not read.
+- **Fix**: Added a root entrypoint preflight that corrects the cookie ownership and mode before delegating to the official RabbitMQ entrypoint.
+
 ---
 *(End of log - new errors will be added below)*

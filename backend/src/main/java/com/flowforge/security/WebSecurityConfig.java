@@ -80,6 +80,7 @@ public class WebSecurityConfig {
             .authorizeHttpRequests(auth -> 
                 auth.requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
+                    .requestMatchers("/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                     .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                     .anyRequest().authenticated()
             );

@@ -17,6 +17,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -32,6 +33,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "spring.rabbitmq.host=localhost",
     "spring.rabbitmq.port=5672",
     "spring.data.redis.host=localhost",
+    "springdoc.api-docs.path=/api-docs",
+    "springdoc.swagger-ui.path=/swagger-ui.html",
     "flowforge.app.jwtSecret=dGVzdFNlY3JldEtleUZvckZsb3dGb3JnZVRlc3RpbmdQdXJwb3Nlc09ubHk=",
     "flowforge.app.jwtExpirationMs=86400000"
 })
@@ -155,5 +158,14 @@ public class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Test\"}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void testOpenApiDocumentationIsPublic() throws Exception {
+        mockMvc.perform(get("/api-docs"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/swagger-ui.html"))
+                .andExpect(status().is3xxRedirection());
     }
 }
